@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>Mi Sistema RPG</title>
+
+    <link rel="stylesheet" href="style.css">
+
+</head>
+
+
+<body>
+
+    <div style="position: absolute; top: 20px; right: 20px;">
+        <button onclick="showGeneralSchedule()" style="padding: 10px; cursor: pointer; border-radius: 5px; border: none; background-color: #007bff; color: white; font-weight: bold; box-shadow: 0px 0px 5px gray; margin-right: 5px;">Cronograma General</button>
+        <button onclick="showHistory()" style="padding: 10px; cursor: pointer; border-radius: 5px; border: none; background-color: #28a745; color: white; font-weight: bold; box-shadow: 0px 0px 5px gray;">Historial</button>
+    </div>
+
+    <h1>Mi Sistema RPG</h1>
+
+    <h3 id="points-container">Puntos: <span id="points">0</span></h3>
+
+    <div id="daily-view">
+        <div style="margin-top: 10px;">
+            <label for="day-selector"><strong>Ver cronograma de:</strong></label>
+            <select id="day-selector" onchange="changeDay()" style="padding: 5px; border-radius: 5px; margin-left: 5px;">
+                <option value="Monday">Lunes</option>
+                <option value="Tuesday">Martes</option>
+                <option value="Wednesday">Miércoles</option>
+                <option value="Thursday">Jueves</option>
+                <option value="Friday">Viernes</option>
+                <option value="Saturday">Sábado</option>
+                <option value="Sunday">Domingo</option>
+            </select>
+            <button onclick="resetDay()" style="margin-left: 10px; cursor: pointer; padding: 5px; border-radius: 5px; border: 1px solid #ccc;">Reiniciar Día</button>
+            <button onclick="resetAll()" style="margin-left: 5px; cursor: pointer; padding: 5px; background-color: #ff4c4c; color: white; border: none; border-radius: 5px;">Reiniciar Todo</button>
+        </div>
+
+        <h2 id="day"></h2>
+
+        <div id="add-task-container" style="margin-bottom: 20px;">
+            <div style="display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <input type="text" id="new-task-input" placeholder="Nombre de la nueva tarea" style="padding: 8px; width: 200px; border-radius: 5px; border: 1px solid #ccc;">
+                
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <input type="checkbox" id="is-default-task" style="cursor: pointer;">
+                    <label for="is-default-task" style="font-size: 14px; cursor: pointer;">Por defecto</label>
+                </div>
+
+                <button onclick="addTask()" style="cursor: pointer; padding: 8px 15px; background-color: #007bff; color: white; border: none; border-radius: 5px;">Agregar</button>
+            </div>
+        </div>
+
+        <div id="tasks">
+
+        </div>
+
+
+        <h2>Recompensas <button id="toggle-rewards-btn" onclick="toggleRewards()" style="font-size: 14px; padding: 5px; cursor: pointer;">Desactivar Recompensas</button></h2>
+
+        <div id="rewards-section">
+            <div id="add-reward-container" style="margin-bottom: 20px;">
+                <input type="text" id="new-reward-name" placeholder="Nombre de la recompensa" style="padding: 8px; width: 180px; border-radius: 5px; border: 1px solid #ccc;">
+                <input type="number" id="new-reward-cost" placeholder="Costo" style="padding: 8px; width: 80px; border-radius: 5px; border: 1px solid #ccc;" min="1">
+                <button onclick="addReward()" style="cursor: pointer;">Agregar Recompensa</button>
+            </div>
+
+            <div id="rewards">
+
+            </div>
+        </div>
+    </div>
+
+    <div id="general-view" style="display: none;">
+        <h2>Cronograma General</h2>
+        <button onclick="goToPreviousView()" style="margin-bottom: 20px; cursor: pointer; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">Volver</button>
+        <div id="general-schedule-grid" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; padding: 20px;">
+            <!-- Cards will be generated here -->
+        </div>
+
+        <h2>Recompensas Disponibles</h2>
+        <div id="general-rewards-grid" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; padding: 20px;">
+            <!-- Rewards will be generated here -->
+        </div>
+    </div>
+
+    <!-- Nueva sección para Historial -->
+    <div id="history-view" style="display: none;">
+        <h2>Historial</h2>
+        
+        <div style="margin-bottom: 20px;">
+            <button onclick="goToPreviousView()" style="cursor: pointer; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">Volver</button>
+            <button onclick="setHistoryView('tasks')" style="margin-left: 10px; cursor: pointer; padding: 8px; border-radius: 5px; background-color: #28a745; color: white; border: none;">Ver Tareas</button>
+            <button onclick="setHistoryView('rewards')" style="margin-left: 5px; cursor: pointer; padding: 8px; border-radius: 5px; background-color: #ffc107; color: black; border: none;">Ver Recompensas</button>
+            <button onclick="setHistoryView('both')" style="margin-left: 5px; cursor: pointer; padding: 8px; border-radius: 5px; background-color: #17a2b8; color: white; border: none;">Ver Ambos</button>
+            <button onclick="clearHistory()" style="margin-left: 20px; cursor: pointer; padding: 8px; border-radius: 5px; background-color: #dc3545; color: white; border: none;">Limpiar Historial</button>
+        </div>
+
+        <div id="history-content" style="max-width: 90%; margin: 0 auto; text-align: left; display: flex; justify-content: center; gap: 20px;">
+            
+            <div id="task-history-column" style="flex: 1; min-width: 300px; display: none;">
+                <h3 style="text-align: center; border-bottom: 2px solid #28a745; padding-bottom: 5px;">Tareas Completadas</h3>
+                <div id="task-history-list">
+                    <!-- Lista de tareas -->
+                </div>
+            </div>
+
+            <div id="reward-history-column" style="flex: 1; min-width: 300px; display: none;">
+                <h3 style="text-align: center; border-bottom: 2px solid #ffc107; padding-bottom: 5px;">Recompensas Reclamadas</h3>
+                 <div id="reward-history-list">
+                    <!-- Lista de recompensas -->
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+
+</body>
+
+</html>
