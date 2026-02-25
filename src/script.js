@@ -39,14 +39,24 @@ function toggleTimeInputs() {
         btn.style.backgroundColor = "#6c757d";
         document.getElementById("new-task-start-time").value = "";
         document.getElementById("new-task-end-time").value = "";
-        document.getElementById("task-duration-display").value = "";
+        
+        let durVal = document.getElementById("task-duration-value");
+        let durUnit = document.getElementById("task-duration-unit");
+        if(durVal) durVal.value = "";
+        if(durUnit) durUnit.value = "m"; // Default to minutes
     }
 }
 
 function calculateDuration() {
+    // Calculo de duración basado en start/end time
     let startInput = document.getElementById("new-task-start-time");
     let endInput = document.getElementById("new-task-end-time");
-    let display = document.getElementById("task-duration-display");
+    
+    // Nuevos inputs
+    let valInput = document.getElementById("task-duration-value");
+    let unitSelect = document.getElementById("task-duration-unit");
+
+    if (!startInput || !endInput) return; // Paranoia
     
     let start = startInput.value;
     let end = endInput.value;
@@ -58,21 +68,66 @@ function calculateDuration() {
         let diffMs = endTime - startTime;
         
         // Manejar cruce de medianoche (ej: 23:00 a 01:00)
+        // NOTA: Si cruzamos medianoche, el resultado es negativo simple.
         if (diffMs < 0) {
+            // Ejemplo: 23:00 (timestamp X) a 01:00 (timestamp Y < X). 
+            // diff = Y - X (negativo). 
+            // Realmente queremos (24h - X) + Y. O sea diff + 24h.
             diffMs += 24 * 60 * 60 * 1000;
         }
         
-        let diffHrs = Math.floor(diffMs / 3600000); 
-        let diffMins = Math.round((diffMs % 3600000) / 60000);
+        // Convertir a minutos totales
+        let totalMinutes = Math.round(diffMs / 60000);
         
-        let durationText = "";
-        if (diffHrs > 0) durationText += diffHrs + "h ";
-        if (diffMins > 0) durationText += diffMins + "m";
-        
-        display.value = durationText.trim();
+        if (totalMinutes % 60 === 0 && totalMinutes > 0) {
+            // Si es hora exacta, poner en Horas
+            valInput.value = totalMinutes / 60;
+            unitSelect.value = "h";
+        } else {
+            // Si no, poner en minutos (aunque sean mas de 60, ej 90m es mas claro que 1.5h a veces, pero dejemoslo simple)
+            valInput.value = totalMinutes;
+            unitSelect.value = "m";
+        }
     } else {
-        display.value = "";
+        // Si borra un tiempo, no borramos la duración manual necesariamente, 
+        // pero la logica original borraba "task-duration-display".
+        // Limpiamos si start o end se borran para que el usuario pueda escribir manualmente
+        // Pero solo si estaba usando el calculo automatico? 
+        // Mejor dejar limpio para evitar conflictos.
+        valInput.value = "";
+        unitSelect.value = "m";
     }
+}
+
+function calculateTaskPoints(durationStr) {
+    // Basic validation
+    if (!durationStr || typeof durationStr !== 'string') return 2; 
+
+    // Parse minutes
+    let minutes = 0;
+    
+    // Check "Xh"
+    let hMatch = durationStr.match(/(\d+(\.\d+)?)h/);
+    if (hMatch) {
+       minutes += parseFloat(hMatch[1]) * 60;
+    }
+    
+    // Check "Ym"
+    let mMatch = durationStr.match(/(\d+)m/);
+    if (mMatch) {
+        minutes += parseInt(mMatch[1]);
+    }
+    
+    // Logic as requested:
+    // > 2 hrs (> 120 mins) => 7 pts
+    // > 1 hr (> 60 mins) => 5 pts
+    // <= 1 hr (<= 60 mins) OR no duration => 2 pts
+    
+    // Note: If minutes is 0 (e.g. invalid string), returns 2. Correct.
+    
+    if (minutes > 120) return 5;
+    if (minutes > 60) return 3;
+    return 1;
 }
 
 function importCSV(input) {
@@ -709,11 +764,21 @@ function addTask() {
     // Obtener valores de hora
     let startTimeInput = document.getElementById("new-task-start-time");
     let endTimeInput = document.getElementById("new-task-end-time");
-    let durationInput = document.getElementById("task-duration-display");
+    
+    // Updated duration inputs
+    let durationValueInput = document.getElementById("task-duration-value");
+    let durationUnitSelect = document.getElementById("task-duration-unit");
 
     let startTime = startTimeInput ? startTimeInput.value : "";
     let endTime = endTimeInput ? endTimeInput.value : "";
-    let duration = durationInput ? durationInput.value.trim() : "";
+    
+    let durVal = durationValueInput ? durationValueInput.value.trim() : "";
+    let durUnit = durationUnitSelect ? durationUnitSelect.value : "m";
+    
+    let duration = "";
+    if (durVal !== "") {
+        duration = durVal + durUnit;
+    }
 
     let checkbox = document.getElementById("is-default-task");
     let isDefault = checkbox ? checkbox.checked : false;
@@ -737,15 +802,17 @@ function addTask() {
         // Reset Time UI
         let timeContainer = document.getElementById("time-inputs-container");
         let btn = document.getElementById("btn-set-time");
-        if(timeContainer.style.display === "flex") {
+        if(timeContainer && timeContainer.style.display === "flex") {
              // Ocultar si estaba abierto y resetear
              timeContainer.style.display = "none";
              btn.innerText = "🕑 Establecer Horario";
              btn.style.backgroundColor = "#6c757d";
         }
-        document.getElementById("new-task-start-time").value = "";
-        document.getElementById("new-task-end-time").value = "";
-        document.getElementById("task-duration-display").value = "";
+        if(startTimeInput) startTimeInput.value = "";
+        if(endTimeInput) endTimeInput.value = "";
+        
+        if(durationValueInput) durationValueInput.value = ""; // Clear number
+        if(durationUnitSelect) durationUnitSelect.value = "m"; // Reset to min
         
         if (checkbox) checkbox.checked = false;
         
@@ -857,17 +924,6 @@ function showGeneralSchedule() {
         return;
     }
     
-    // Función auxiliar para crear tarjetas
-    const createCardStyle = (element) => {
-        element.style.background = "white";
-        element.style.padding = "15px";
-        element.style.width = "200px";
-        element.style.borderRadius = "10px";
-        element.style.boxShadow = "0px 0px 5px gray";
-        element.style.textAlign = "center";
-        element.style.margin = "10px";
-    };
-
     if (rewards.length === 0) {
         let emptyMsg = document.createElement("p");
         emptyMsg.innerText = "No hay recompensas configuradas.";
@@ -876,21 +932,32 @@ function showGeneralSchedule() {
     } else {
         rewards.forEach(r => {
             let card = document.createElement("div");
-            createCardStyle(card);
+            card.className = "task"; // Use the main task class for glassmorphism
+            card.style.width = "200px"; // Override grid-based width for this specific flex view
+            card.style.margin = "10px";
+            card.style.justifyContent = "center";
+            
+            // Special styling for "Protector de Racha"
+            if(r.name === "Protector de Racha") {
+                card.style.borderColor = "#28a745";
+                card.style.background = "linear-gradient(135deg, rgba(40, 167, 69, 0.1), rgba(0,0,0,0.2))";
+                card.style.boxShadow = "0 0 15px rgba(40, 167, 69, 0.2)";
+            }
 
             let title = document.createElement("h3");
             title.innerText = r.name;
-            title.style.borderBottom = "1px solid #eee";
+            title.style.borderBottom = "1px solid rgba(255,255,255,0.1)";
             title.style.paddingBottom = "5px";
             title.style.marginBottom = "5px";
-            title.style.fontSize = "16px";
+            title.style.fontSize = "1.1rem";
             title.style.marginTop = "0";
+            title.style.color = "var(--text-primary)";
             card.appendChild(title);
 
             let cost = document.createElement("p");
             cost.innerText = "Costo: " + r.cost + " pts";
             cost.style.fontWeight = "bold";
-            cost.style.color = "#007bff";
+            cost.style.color = "var(--accent-blue)";
             cost.style.margin = "0";
             card.appendChild(cost);
 
@@ -965,11 +1032,8 @@ function renderHistoryList(data, containerId, type) {
 
     sortedData.forEach(record => {
         let item = document.createElement("div");
-        item.style.backgroundColor = "white";
-        item.style.borderBottom = "1px solid #eee";
-        item.style.padding = "10px";
-        item.style.marginBottom = "5px";
-        item.style.borderRadius = "5px";
+        item.className = "history-item";
+        item.style.borderBottom = "1px solid rgba(255,255,255,0.1)";
         
         let header = document.createElement("div");
         header.style.fontSize = "12px";
@@ -1074,8 +1138,7 @@ function load() {
 
         div.className = "task";
         if (isCompleted) {
-            div.style.backgroundColor = "#d4edda"; // Verde claro para completadas
-            div.style.borderColor = "#c3e6cb";
+            div.classList.add("completed");
         }
 
         if (isDefault) {
@@ -1086,7 +1149,7 @@ function load() {
         }
 
         let contentDiv = document.createElement("div");
-        contentDiv.style.textAlign = "left";
+        contentDiv.style.textAlign = "center"; 
         contentDiv.style.width = "100%";
         
         let nameDiv = document.createElement("div");
@@ -1094,7 +1157,7 @@ function load() {
         nameDiv.style.fontWeight = "bold";
         if (isCompleted) {
             nameDiv.style.textDecoration = "line-through";
-            nameDiv.style.color = "#155724";
+            nameDiv.style.opacity = "0.7";
         }
         contentDiv.appendChild(nameDiv);
 
@@ -1117,7 +1180,7 @@ function load() {
         if (timeText) {
             let timeDiv = document.createElement("div");
             timeDiv.style.fontSize = "0.85em";
-            timeDiv.style.color = "#666";
+            timeDiv.style.color = "var(--text-secondary)";
             timeDiv.style.marginTop = "2px";
             timeDiv.innerText = timeText;
             if (isCompleted) {
@@ -1149,15 +1212,39 @@ function load() {
                         date: now.toLocaleDateString(),
                         time: now.toLocaleTimeString()
                     };
-                    taskHistory.push(record);
-
-                    points += 5;
+                    // Registrar puntos variables
+                    let pts = 2; // Default (<= 1 hr o sin duración)
+                    let taskItem = tasks[currentViewDay][index];
+                    if(typeof taskItem === 'object' && taskItem.duration) {
+                         pts = calculateTaskPoints(taskItem.duration);
+                    }
                     
-                    // Marcar como completada
+                    points += pts;
+                    
+                    // Alerta opcional o feedback visual del puntaje ganado
+                    // alert(`¡Tarea completada! Has ganado ${pts} puntos.`);
+                    
+                    // Registrar historial
                     if (typeof tasks[currentViewDay][index] === 'string') {
                         tasks[currentViewDay][index] = { name: tasks[currentViewDay][index], completed: true };
                     } else {
                         tasks[currentViewDay][index].completed = true;
+                    }
+
+                    // Verificar si se han completado TODAS las tareas por defecto del dia actual
+                    let currentDayList = tasks[currentViewDay] || [];
+                    
+                    // Filtrar tareas que sean objetos y tengan isDefault: true
+                    let defaults = currentDayList.filter(t => (typeof t === 'object' && t.isDefault));
+                    
+                    // Si hay tareas por defecto y TODAS estan completadas
+                    if (defaults.length > 0) {
+                        let allDone = defaults.every(t => t.completed);
+                        if(allDone) {
+                             // Dar bono extra
+                             points += 3;
+                             alert("🎉 ¡FELICITACIONES! 🎉\n\nHas completado todas las tareas obligatorias de hoy.\n¡Recibes 3 puntos extra!");
+                        }
                     }
 
                     updatePoints();
@@ -1169,9 +1256,7 @@ function load() {
                 // Botón Repetir
                 let btn = document.createElement("button");
                 btn.innerText = "Repetir";
-                btn.style.marginRight = "5px";
-                btn.style.backgroundColor = "#ffc107";
-                btn.style.color = "black";
+                btn.className = "btn-warning";
                 
                 btn.onclick = function () {
                     if(confirm("¿Quieres repetir esta tarea? Se volverá a habilitar y podrás completarla de nuevo.")) {
@@ -1186,9 +1271,7 @@ function load() {
 
         let deleteBtn = document.createElement("button");
         deleteBtn.innerText = "Eliminar";
-        deleteBtn.style.backgroundColor = "#ff4c4c"; 
-        deleteBtn.style.color = "white"; 
-        deleteBtn.style.border = "none";
+        deleteBtn.className = "btn-danger";
         
         deleteBtn.onclick = function() {
             if(confirm("¿Estás seguro de que deseas eliminar esta tarea?")) {
@@ -1244,13 +1327,15 @@ function loadRewards() {
     // Mostrar Estado de Escudos
     if(activeStreakProtectors > 0) {
         let statusDiv = document.createElement("div");
-        statusDiv.style.backgroundColor = "#d4edda";
-        statusDiv.style.color = "#155724";
+        statusDiv.style.background = "linear-gradient(90deg, rgba(40, 167, 69, 0.2), rgba(0, 0, 0, 0))";
+        statusDiv.style.borderLeft = "4px solid #28a745";
+        statusDiv.style.color = "#98ffb3";
         statusDiv.style.padding = "10px";
         statusDiv.style.marginBottom = "15px";
         statusDiv.style.borderRadius = "5px";
-        statusDiv.style.textAlign = "center";
+        statusDiv.style.textAlign = "left";
         statusDiv.style.fontWeight = "bold";
+        statusDiv.style.gridColumn = "1 / -1"; // Ocupar todo el ancho
         statusDiv.innerText = "🛡️  TIENES " + activeStreakProtectors + " PROTECTOR(ES) DE RACHA ACTIVO(S)";
         container.appendChild(statusDiv);
     }
@@ -1265,8 +1350,9 @@ function loadRewards() {
         
         // Estilo especial para protector
         if(r.name === protectorName) {
-            div.style.border = "2px solid #28a745";
-            div.style.backgroundColor = "#f0fff4";
+            div.style.borderColor = "#28a745";
+            div.style.background = "linear-gradient(135deg, rgba(40, 167, 69, 0.1), rgba(0,0,0,0.2))";
+            div.style.boxShadow = "0 0 15px rgba(40, 167, 69, 0.2)";
         }
 
         let textSpan = document.createElement("span");
@@ -1342,10 +1428,7 @@ function loadRewards() {
         if(r.name !== protectorName) {
             let deleteBtn = document.createElement("button");
             deleteBtn.innerText = "Eliminar";
-            deleteBtn.style.backgroundColor = "#ff4c4c"; 
-            deleteBtn.style.color = "white"; 
-            deleteBtn.style.border = "none";
-            deleteBtn.style.marginLeft = "10px";
+            deleteBtn.className = "btn-danger";
             
             deleteBtn.onclick = function() {
                 if(confirm("¿Estás seguro de que deseas eliminar esta recompensa?")) {
