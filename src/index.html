@@ -15,13 +15,37 @@
 <body>
 
     <div style="position: absolute; top: 20px; right: 20px;">
+        <div style="margin-bottom: 5px; text-align: right;">
+            <label style="font-size: 12px; cursor: pointer;">
+                <input type="checkbox" id="dev-mode-toggle" onchange="toggleDevMode()"> Modo Desarrollador
+            </label>
+        </div>
+        <input type="file" id="import-csv-input" accept=".csv" style="display: none;" onchange="importCSV(this)">
+        <button onclick="document.getElementById('import-csv-input').click()" style="padding: 10px; cursor: pointer; border-radius: 5px; border: none; background-color: #17a2b8; color: white; font-weight: bold; box-shadow: 0px 0px 5px gray; margin-right: 5px;">Importar CSV</button>
         <button onclick="showGeneralSchedule()" style="padding: 10px; cursor: pointer; border-radius: 5px; border: none; background-color: #007bff; color: white; font-weight: bold; box-shadow: 0px 0px 5px gray; margin-right: 5px;">Cronograma General</button>
         <button onclick="showHistory()" style="padding: 10px; cursor: pointer; border-radius: 5px; border: none; background-color: #28a745; color: white; font-weight: bold; box-shadow: 0px 0px 5px gray;">Historial</button>
+        
+        <!-- Controles Dev Mode -->
+        <div id="dev-controls" style="display: none; margin-top: 10px; padding: 5px; border: 1px dashed red; background: #fff0f0;">
+            <div style="display: flex; gap: 5px; align-items: center;">
+                <h4 style="margin: 0; color: red;">Dev Tools</h4>
+                <button onclick="simulateNextDay()" style="padding: 5px; cursor: pointer; background-color: purple; color: white; border: none; border-radius: 3px; font-size: 12px;">⏩ Siguiente</button>
+                <button onclick="document.getElementById('dev-date-input').showPicker()" style="padding: 5px; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 3px; font-size: 12px;">📅 Ir a Fecha</button>
+                <input type="date" id="dev-date-input" style="width: 0; height: 0; opacity: 0; position: absolute;" onchange="navigateToDate(this.value)">
+            </div>
+            <div id="simulated-date-display" style="font-size: 11px; color: #d00; margin-top: 2px; font-weight: bold;"></div>
+        </div>
     </div>
 
     <h1>Mi Sistema RPG</h1>
 
-    <h3 id="points-container">Puntos: <span id="points">0</span></h3>
+    <div style="display: flex; justify-content: center; gap: 20px; align-items: center;">
+        <h3 id="points-container">Puntos: <span id="points">0</span></h3>
+        <div style="display: flex; align-items: center; gap: 5px;">
+             <h3 id="streak-container" style="color: #ff9800;">🔥 Racha: <span id="streak">0</span> días</h3>
+             <button id="reset-streak-btn" onclick="resetStreak()" style="display: none; font-size: 10px; padding: 2px 5px; cursor: pointer; border-radius: 3px; border: 1px solid #ccc; background-color: transparent;" title="Reiniciar Racha (DEV)">✖</button>
+        </div>
+    </div>
 
     <div id="daily-view">
         <div style="margin-top: 10px;">
@@ -36,6 +60,7 @@
                 <option value="Sunday">Domingo</option>
             </select>
             <button onclick="resetDay()" style="margin-left: 10px; cursor: pointer; padding: 5px; border-radius: 5px; border: 1px solid #ccc;">Reiniciar Día</button>
+            <button onclick="deleteAllTasks()" style="margin-left: 5px; cursor: pointer; padding: 5px; background-color: #ffc107; color: black; border: none; border-radius: 5px;">Borrar Tareas</button>
             <button onclick="resetAll()" style="margin-left: 5px; cursor: pointer; padding: 5px; background-color: #ff4c4c; color: white; border: none; border-radius: 5px;">Reiniciar Todo</button>
         </div>
 

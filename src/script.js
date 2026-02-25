@@ -75,46 +75,363 @@ function calculateDuration() {
     }
 }
 
+function importCSV(input) {
+    let file = input.files[0];
+    if (!file) return;
+
+    let reader = new FileReader();
+    reader.onload = function(e) {
+        let content = e.target.result;
+        // Normalizar saltos de linea
+        let lines = content.replace(/\r\n/g, "\n").split("\n");
+        let count = 0;
+
+        if (lines.length > 0) {
+            let firstLine = lines[0].toLowerCase();
+            // Checking if header contains expected columns to skip
+            if (firstLine.includes("dia") && (firstLine.includes("hora") || firstLine.includes("time"))) {
+                lines.shift();
+            }
+        }
+
+        // Mapa para normalizar nombres de días
+        let dayMap = {
+            "monday": "Monday", "lunes": "Monday",
+            "tuesday": "Tuesday", "martes": "Tuesday",
+            "wednesday": "Wednesday", "miercoles": "Wednesday", "miércoles": "Wednesday",
+            "thursday": "Thursday", "jueves": "Thursday",
+            "friday": "Friday", "viernes": "Friday",
+            "saturday": "Saturday", "sabado": "Saturday", "sábado": "Saturday",
+            "sunday": "Sunday", "domingo": "Sunday"
+        };
+
+        lines.forEach(line => {
+            line = line.trim();
+            if (!line) return;
+            
+            let parts = line.split(",");
+            if (parts.length < 3) return; // Mínimo Dia, Hora, Actividad
+
+            let dayRaw = parts[0].trim().toLowerCase();
+            let keyDay = dayMap[dayRaw];
+
+            if (!keyDay) return; // Día no válido, saltar
+
+            let timeRange = parts[1].trim(); 
+            let taskName = parts.slice(2).join(",").trim(); // Nombre actividad
+
+            // Parsear hora: HH:mm-HH:mm
+            let startTime = "";
+            let endTime = "";
+            let duration = "";
+
+            if (timeRange.includes("-")) {
+                let times = timeRange.split("-");
+                startTime = times[0].trim();
+                endTime = times[1].trim();
+                
+                // Intentar calcular duración
+                try {
+                    let parse = (t) => {
+                        let [h, m] = t.split(":").map(Number);
+                        return h * 60 + m;
+                    }
+                    let startM = parse(startTime);
+                    let endM = parse(endTime);
+                    if (!isNaN(startM) && !isNaN(endM)) {
+                        let diff = endM - startM;
+                        if (diff < 0) diff += 1440; // 24h * 60m
+                        let h = Math.floor(diff / 60);
+                        let m = diff % 60;
+                        if (h > 0) duration += h + "h ";
+                        if (m > 0) duration += m + "m";
+                        duration = duration.trim();
+                    }
+                } catch(err) { /* Ignorar error de calculo */ }
+            } else {
+                startTime = timeRange;
+            }
+
+            if (!tasks[keyDay]) tasks[keyDay] = [];
+
+            // Añadir tarea (Por defecto = true, asumimos recurrente)
+            tasks[keyDay].push({
+                name: taskName,
+                completed: false,
+                isDefault: true,
+                startTime: startTime,
+                endTime: endTime,
+                duration: duration
+            });
+            count++;
+        });
+
+        saveData();
+        load();
+        alert(`Se han importado ${count} actividades.`);
+        input.value = ""; 
+    };
+    reader.readAsText(file);
+}
+
+let streak = 0;
+let lastStreakDate = ""; // Formato "YYYY-MM-DD"
+let activeStreakProtectors = 0; // Cantidad de "escudos" activos
+
+// Variables para el modo desarrollador
+let simulatedDayOffset = 0; 
+let isDevMode = false;
+let backupState = null; // Para guardar el estado real antes de entrar al sandbox
+let devTaskHistory = {}; // Historial de completado por fecha para modo dev { "YYYY-MM-DD": ["TaskName1", "TaskName2"] }
+
+function toggleDevMode() {
+    let check = document.getElementById("dev-mode-toggle");
+    let enteringDevMode = check.checked;
+    
+    // Mostrar/ocultar controles
+    let controls = document.getElementById("dev-controls");
+    let resetStreakBtn = document.getElementById("reset-streak-btn");
+    
+    if (enteringDevMode) {
+        // ENTRAR A MODO DEV (SANDBOX)
+        isDevMode = true;
+        
+        // 1. Guardar estado real actual
+        backupState = {
+            tasks: JSON.parse(JSON.stringify(tasks)),
+            points: points,
+            rewards: JSON.parse(JSON.stringify(rewards)),
+            rewardsActive: rewardsActive,
+            taskHistory: JSON.parse(JSON.stringify(taskHistory)),
+            rewardHistory: JSON.parse(JSON.stringify(rewardHistory)),
+            streak: streak,
+            lastStreakDate: lastStreakDate,
+            activeStreakProtectors: activeStreakProtectors
+        };
+        
+        // Cargar historial dev si existe
+        let savedDevHistory = localStorage.getItem("dev_rpg_task_completion_history");
+        if(savedDevHistory) devTaskHistory = JSON.parse(savedDevHistory);
+        else devTaskHistory = {};
+        
+        // Pre-cargar item "Protector" en tienda dev si no existe, solo para testear? 
+        // No, mejor usar logica compartida.
+        
+        // UI Updates
+        if(controls) controls.style.display = "block";
+        if(resetStreakBtn) resetStreakBtn.style.display = "block";
+        updateSimulatedDateDisplay();
+        
+    } else {
+        // SALIR DE MODO DEV (RESTAURAR)
+        isDevMode = false;
+        
+        if (backupState) {
+            // Restaurar estado original
+            tasks = backupState.tasks;
+            points = backupState.points;
+            rewards = backupState.rewards;
+            rewardsActive = backupState.rewardsActive;
+            taskHistory = backupState.taskHistory;
+            rewardHistory = backupState.rewardHistory;
+            streak = backupState.streak;
+            lastStreakDate = backupState.lastStreakDate;
+            activeStreakProtectors = backupState.activeStreakProtectors || 0;
+            
+            backupState = null; // Limpiar backup
+        }
+        
+        // Resetear simulación de tiempo
+        simulatedDayOffset = 0;
+        
+        // UI Updates
+        if(controls) controls.style.display = "none";
+        if(resetStreakBtn) resetStreakBtn.style.display = "none";
+        
+        // Forzar guardado del estado restaurado para sobreescribir lo que hizo el Dev Mode en localStorage
+        saveData();
+        
+        // Recargar vista
+        currentViewDay = getDay();
+        load();
+    }
+}
+
+function getSimulatedDate() {
+    let d = new Date();
+    d.setDate(d.getDate() + simulatedDayOffset);
+    return d;
+}
+
+function saveCurrentDayState() {
+    if (!isDevMode) return;
+    
+    // Guardar solo si estamos simulando un día (simulatedDayOffset != 0) o ya empezamos dev mode
+    // Guardar estado del día actual en historial dev antes de cambiar
+    // NOTA: getSimulatedDate() retorna la fecha + offset
+    let d = getSimulatedDate();
+    d.setHours(0,0,0,0);
+    // Formato YYYY-MM-DD
+    let dateStr = d.getFullYear() + "-" + (d.getMonth()+1).toString().padStart(2, '0') + "-" + d.getDate().toString().padStart(2, '0');
+
+    let dayName = getDay(); // "Monday", etc.
+    
+    if (tasks[dayName]) {
+        // Guardar indices de tareas completadas
+        let completedIndices = tasks[dayName]
+            .map((t, i) => t.completed ? i : -1)
+            .filter(i => i !== -1);
+            
+        devTaskHistory[dateStr] = completedIndices;
+        localStorage.setItem("dev_rpg_task_completion_history", JSON.stringify(devTaskHistory));
+    }
+}
+
+function loadDayState(dateStr) { // dateStr debe venir calculado
+    if (!isDevMode) return;
+
+    let dayName = getDay();
+    let savedIndices = devTaskHistory[dateStr];
+    
+    if (tasks[dayName]) {
+        if (savedIndices && Array.isArray(savedIndices)) {
+            // Restaurar estado conocido
+            tasks[dayName].forEach((t, i) => {
+                t.completed = savedIndices.includes(i);
+            });
+        } else {
+            // No hay historial para este día -> Limpiar (Día nuevo)
+            tasks[dayName].forEach(t => {
+                t.completed = false;
+            });
+        }
+    }
+}
+
+function getSimulatedDateString() {
+    let d = getSimulatedDate();
+    d.setHours(0,0,0,0);
+    return d.getFullYear() + "-" + (d.getMonth()+1).toString().padStart(2, '0') + "-" + d.getDate().toString().padStart(2, '0');
+}
+
+function simulateNextDay() {
+    // 1. Guardar estado del dia que abandonamos
+    saveCurrentDayState();
+
+    // 2. Avanzar
+    simulatedDayOffset++;
+    updateSimulatedDateDisplay();
+    
+    // 3. Cargar estado del nuevo día
+    currentViewDay = getDay(); 
+    checkStreakContinuity(); 
+    
+    let newDateStr = getSimulatedDateString();
+    loadDayState(newDateStr);
+
+    saveData(); 
+    load(); 
+}
+
+function updateSimulatedDateDisplay() {
+    let d = getSimulatedDate();
+    // Normalizar a medianoche para evitar problemas con toLocaleDateString y UTC
+    d.setHours(0,0,0,0);
+    // Usar formato explicito para asegurar consistencia
+    let options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    let display = document.getElementById("simulated-date-display");
+    if(display) {
+        display.innerText = "Simulando: " + d.toLocaleDateString("es-ES", options);
+    }
+}
+
+function navigateToDate(dateString) {
+    if(!dateString) return;
+
+    // 1. Guardar estado actual antes de saltar
+    saveCurrentDayState();
+
+    // Calcular offset desde hoy real hasta fecha target
+    let parts = dateString.split('-');
+    // Mes en Date es 0-11
+    let targetDate = new Date(parts[0], parts[1]-1, parts[2]); 
+    let today = new Date(); 
+    today.setHours(0,0,0,0);
+    targetDate.setHours(0,0,0,0);
+
+    let diffMs = targetDate - today;
+    let diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+    
+    simulatedDayOffset = diffDays;
+    
+    // UI Update
+    updateSimulatedDateDisplay();
+    currentViewDay = getDay(); 
+    
+    // IMPORTANTE: Check racha FIRST en caso de salto temporal grande
+    checkStreakContinuity();
+    
+    // 2. Cargar estado del destino
+    let newDateStr = getSimulatedDateString();
+    loadDayState(newDateStr);
+    
+    saveData();
+    load();
+}
+
 function saveData() {
-    localStorage.setItem("rpg_points", points);
-    localStorage.setItem("rpg_tasks", JSON.stringify(tasks));
-    localStorage.setItem("rpg_rewards", JSON.stringify(rewards));
-    localStorage.setItem("rpg_rewards_active", rewardsActive);
-    localStorage.setItem("rpg_task_history", JSON.stringify(taskHistory));
-    localStorage.setItem("rpg_reward_history", JSON.stringify(rewardHistory));
+    // Definir prefijo: "rpg_" para datos reales, "dev_rpg_" para sandbox
+    let prefix = isDevMode ? "dev_rpg_" : "rpg_";
+    
+    // Si estamos en modo Dev, guardamos en el sandbox
+    localStorage.setItem(prefix + "points", points);
+    localStorage.setItem(prefix + "tasks", JSON.stringify(tasks));
+    localStorage.setItem(prefix + "rewards", JSON.stringify(rewards));
+    localStorage.setItem(prefix + "rewards_active", rewardsActive);
+    localStorage.setItem(prefix + "task_history", JSON.stringify(taskHistory));
+    localStorage.setItem(prefix + "reward_history", JSON.stringify(rewardHistory));
+    localStorage.setItem(prefix + "streak", streak);
+    localStorage.setItem(prefix + "last_streak_date", lastStreakDate);
+    localStorage.setItem(prefix + "active_streak_protectors", activeStreakProtectors);
 }
 
 function loadData() {
-    let savedPoints = localStorage.getItem("rpg_points");
+    // Al cargar la app (inicio), SIEMPRE cargamos los datos reales ("rpg_").
+    let prefix = "rpg_";
+
+    let savedPoints = localStorage.getItem(prefix + "points");
     if (savedPoints !== null) points = parseInt(savedPoints);
 
-    let savedTasks = localStorage.getItem("rpg_tasks");
+    let savedStreak = localStorage.getItem(prefix + "streak");
+    if (savedStreak !== null) streak = parseInt(savedStreak);
+
+    let savedLastStreakDate = localStorage.getItem(prefix + "last_streak_date");
+    if (savedLastStreakDate !== null) lastStreakDate = savedLastStreakDate;
+    
+    let savedProtectors = localStorage.getItem(prefix + "active_streak_protectors");
+    if (savedProtectors !== null) activeStreakProtectors = parseInt(savedProtectors);
+
+    // Verificar si se rompió la racha (si ayer no se completó)
+    // Se mueve al final para asegurar que taskHistory esté cargado si se necesita
+    // if (!isDevMode) checkStreakContinuity(); 
+
+    let savedTasks = localStorage.getItem(prefix + "tasks");
     if (savedTasks !== null) {
         tasks = JSON.parse(savedTasks);
         
         // Migración: Asegurar que todas las tareas sean objetos y tengan isDefault si es legacy
         for (let day in tasks) {
             tasks[day] = tasks[day].map((t, index) => {
-                // Si es string (legacy muy antiguo), convertir
                 if (typeof t === 'string') {
-                    // Check if it's in initialTasks, if so mark as default.
-                    // Actually, simpler to assume if user didn't explicitly set it, it's not default unless we detect it.
-                    // But initialTasks was: "Mineria", "Rust", etc.
-                    // If we want to preserve old behavior, we could mark them as default.
-                    
                     let isInitial = false;
                     if (initialTasks[day]) {
                         isInitial = initialTasks[day].includes(t);
                     }
-                    
                     return { name: t, completed: false, isDefault: isInitial };
                 }
-                // Si es objeto pero no tiene isDefault (legacy reciente), inicializar
                 if (typeof t === 'object' && t.isDefault === undefined) {
-                    // Check against initialTasks
                      let isInitial = false;
                     if (initialTasks[day]) {
-                        // Check if initialTasks has strings or objects (it was strings originally)
                          if (initialTasks[day].some(initialT => (typeof initialT === 'string' ? initialT : initialT.name) === t.name)) {
                              isInitial = true;
                          }
@@ -125,42 +442,154 @@ function loadData() {
             });
         }
     } else {
-        // Primera carga absoluta, convertir initialTasks a formato con isDefault
-        // initialTasks eran strings.
         for (let day in tasks) {
             tasks[day] = tasks[day].map(t => {
                  if (typeof t === 'string') {
                     return { name: t, completed: false, isDefault: true };
                 }
-                return t; // Should not happen given initialTasks format
+                return t; 
             });
         }
     }
 
-    let savedRewards = localStorage.getItem("rpg_rewards");
+    let savedRewards = localStorage.getItem(prefix + "rewards");
     if (savedRewards !== null) rewards = JSON.parse(savedRewards);
 
-    let savedRewardsActive = localStorage.getItem("rpg_rewards_active");
+    let savedRewardsActive = localStorage.getItem(prefix + "rewards_active");
     if (savedRewardsActive !== null) rewardsActive = (savedRewardsActive === 'true');
     
     // Migración de datos antiguos si existen
     let oldHistory = localStorage.getItem("rpg_history");
     if (oldHistory !== null) {
         taskHistory = JSON.parse(oldHistory);
-        localStorage.removeItem("rpg_history"); // Limpiar dato antiguo
+        localStorage.removeItem("rpg_history"); 
     } else {
-        let savedTaskHistory = localStorage.getItem("rpg_task_history");
+        let savedTaskHistory = localStorage.getItem(prefix + "task_history");
         if (savedTaskHistory !== null) taskHistory = JSON.parse(savedTaskHistory);
     }
 
-    let savedRewardHistory = localStorage.getItem("rpg_reward_history");
+    let savedRewardHistory = localStorage.getItem(prefix + "reward_history");
     if (savedRewardHistory !== null) rewardHistory = JSON.parse(savedRewardHistory);
+    
+    checkStreakContinuity();
 }
 
 function toggleRewards() {
     rewardsActive = !rewardsActive;
     saveData();
     updateRewardsVisibility();
+}
+
+function checkStreakContinuity() {
+    let today = getSimulatedDate();
+    today.setHours(0, 0, 0, 0); 
+
+    if (lastStreakDate) {
+        // Asegurar parsing correcto de YYYY-MM-DD como fecha local
+        let parts = lastStreakDate.split('-');
+        let lastDate = new Date(parts[0], parts[1] - 1, parts[2]);
+        lastDate.setHours(0, 0, 0, 0);
+        
+        let diffTime = today - lastDate;
+        let diffDays = diffTime / (1000 * 60 * 60 * 24);
+
+        // Si lastStreakDate fue ayer, mantenemos racha intacta (no sumamos aun, solo verificamos no perderla)
+        // Si fue hoy, ya se sumó.
+        // Si fue hace más de 1 día (ej. anteayer), racha perdida = 0.
+        // Tolerancia pequeña por errores de punto flotante
+        if (Math.round(diffDays) > 1) {
+            // Lógica de Protección de Racha
+            if (activeStreakProtectors > 0) {
+                // Gastar un escudo por cada dia perdido? 
+                // O gastar uno solo para salvar la racha actual?
+                // Simplifiquemos: 1 escudo salva la racha tras volver (aunque haya pasado 1 semana).
+                // Pero lo lógico es que el escudo cubra "el día que no viniste".
+                // Si faltaste 3 días, necesitarías 3 escudos.
+                
+                let daysMissed = Math.floor(diffDays) - 1;
+                
+                if (activeStreakProtectors >= daysMissed) {
+                    activeStreakProtectors -= daysMissed;
+                    alert(`¡RACHA SALVADA! 🛡️\nHas usado ${daysMissed} protector(es) de racha por los días ausentes.`);
+                    // No reseteamos streak.
+                    // Actualizamos lastStreakDate a "ayer" para que parezca que no pasó nada y hoy pueda sumar?
+                    // No, simplemente al no resetear, cuando complete hoy sumará.
+                } else {
+                    // No tiene suficientes escudos
+                    activeStreakProtectors = 0; // Se consumen intentando salvar
+                    streak = 0;
+                    alert("¡RACHA PERDIDA! 😢\nNo tenías suficientes protectores de racha para cubrir tu ausencia.");
+                }
+            } else {
+                streak = 0;
+            }
+            saveData();
+        }
+    } else {
+        streak = 0;
+    }
+    
+    // update UI
+    if (document.getElementById("streak")) {
+        document.getElementById("streak").innerText = streak;
+    }
+}
+
+function updateStreakStatus() {
+    let todayDate = getSimulatedDate();
+    todayDate.setHours(0, 0, 0, 0);
+    let todayStr = todayDate.toLocaleDateString('en-CA'); // YYYY-MM-DD local
+
+    // Si ya se ha contabilizado la racha hoy (lastStreakDate == hoy), no hacer nada
+    if (lastStreakDate === todayStr) {
+        return;
+    }
+
+    // Obtener tareas del día actual (REAL)
+    // El sistema usa getDay() que retorna el nombre en inglés del día actual real.
+    let todayName = getDay(); 
+    let dayTasks = tasks[todayName] || [];
+    
+    // Filtrar tareas por defecto
+    let defaultTasks = dayTasks.filter(t => t.isDefault);
+    let totalDefault = defaultTasks.length;
+
+    // Si no hay tareas por defecto hoy, no se puede avanzar racha (o se regala?).
+    // Supongamos que se necesita actividad. 
+    if (totalDefault === 0) return; 
+
+    // Contar completadas
+    let completedDefault = defaultTasks.filter(t => t.completed).length;
+
+    // Lógica: "cantidad de tareas por defecto del día - 1"
+    // Si hay 1 tarea: 1-1=0? No tiene sentido, mínimo 1 para contar.
+    // Si hay 5 tareas: 5-1=4.
+    let threshold = Math.max(1, totalDefault - 1);
+
+    if (completedDefault >= threshold) {
+        // Racha conseguida!
+        streak++;
+        lastStreakDate = todayStr;
+        saveData();
+        
+        // Animación simple
+        let s = document.getElementById("streak");
+        if(s) {
+            s.innerText = streak;
+            s.style.transition = "transform 0.3s";
+            s.style.transform = "scale(1.5)";
+            setTimeout(() => s.style.transform = "scale(1)", 300);
+        }
+    }
+}
+
+function resetStreak() {
+    if (confirm("¿Estás seguro de que deseas reiniciar tu racha a 0?")) {
+        streak = 0;
+        lastStreakDate = "";
+        saveData();
+        document.getElementById("streak").innerText = streak;
+    }
 }
 
 function updateRewardsVisibility() {
@@ -184,11 +613,9 @@ function updateRewardsVisibility() {
 }
 
 function getDay() {
-
-    let d = new Date().toLocaleDateString("en-US", { weekday: "long" });
-
-    return d;
-
+    let d = getSimulatedDate();
+    let day = d.toLocaleDateString("en-US", { weekday: "long" });
+    return day;
 }
 
 let currentViewDay = getDay();
@@ -228,25 +655,49 @@ function resetDay() {
     }
 }
 
+function deleteAllTasks() {
+    if (confirm("¿Estás seguro de que deseas BORRAR TODAS LAS TAREAS de todos los días?\n\nEsta acción eliminará todas las actividades, incluyendo las recurrentes/por defecto.\n\nTus puntos, historial y recompensas SE MANTENDRÁN.")) {
+        tasks = {
+            Monday: [],
+            Tuesday: [],
+            Wednesday: [],
+            Thursday: [],
+            Friday: [],
+            Saturday: [],
+            Sunday: []
+        };
+        saveData();
+        load();
+        alert("Todas las tareas han sido eliminadas.");
+    }
+}
+
 function resetAll() {
-    if (confirm("¿Estás seguro de que quieres reiniciar todo? Se borrarán las tareas NO 'por defecto', se reiniciarán las completadas y los puntos volverán a 0.")) {
-        // Reiniciar tareas preservando solo las "default"
-        for (let day in tasks) {
-            let dayTasks = tasks[day] || [];
-            // Filtrar y reiniciar estado
-            tasks[day] = dayTasks.filter(t => t.isDefault === true).map(t => {
-                t.completed = false;
-                return t;
-            });
-        }
+    if (confirm("¡ADVERTENCIA CRÍTICA! ¿Estás seguro de que quieres BORRAR TODO? \n\nSe eliminarán TODAS las tareas (incluyendo las tareas por defecto), el historial, las recompensas y los puntos.\n\nEl sistema volverá a estar completamente vacío.")) {
+        // Reiniciar todo a estado inicial vacio
+        tasks = {
+            Monday: [],
+            Tuesday: [],
+            Wednesday: [],
+            Thursday: [],
+            Friday: [],
+            Saturday: [],
+            Sunday: []
+        };
         
         rewards = [];
         points = 0;
+        streak = 0;
+        lastStreakDate = "";
+        activeStreakProtectors = 0;
         taskHistory = [];
         rewardHistory = []; 
         saveData();
         updatePoints();
+        updateStreakDisplay();
         load();
+        
+        alert("El sistema se ha reiniciado por completo.");
     }
 }
 
@@ -312,6 +763,7 @@ function addReward() {
     let name = nameInput.value.trim();
     let cost = parseInt(costInput.value);
 
+    // Permitir costo 0 o negativo solo en DevMode? No, mejor mantener consistencia o permitir en dev.
     if (name !== "" && !isNaN(cost) && cost > 0) {
         rewards.push({ name: name, cost: cost });
         nameInput.value = "";
@@ -572,7 +1024,26 @@ function load() {
         "Monday": "Lunes", "Tuesday": "Martes", "Wednesday": "Miércoles",
         "Thursday": "Jueves", "Friday": "Viernes", "Saturday": "Sábado", "Sunday": "Domingo"
     };
-    document.getElementById("day").innerText = dayNames[currentViewDay] || currentViewDay;
+    
+    // Obtener la fecha para mostrarla junto al nombre del día
+    // Si la vista seleccionada no es la del "día actual" (real/simulado), 
+    // tenemos que calcular qué fecha corresponde a ese día de la semana.
+    // Lógica simplificada: 
+    // 1. Si currentViewDay == getDay() => Usamos getSimulatedDate()
+    // 2. Si no, calculamos la diferencia de indices de días para estimar la fecha RELATIVA a hoy.
+    // Esto es complejo porque "Lunes" puede ser "Lunes pasado" o "Lunes futuro".
+    // ASUMIMOS que el selector solo cambia la vista de la semana actual.
+    
+    let daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    let currentDayIndex = getSimulatedDate().getDay(); // 0-6 (Dom-Sab)
+    let selectedDayIndex = daysOfWeek.indexOf(currentViewDay);
+    
+    let diff = selectedDayIndex - currentDayIndex;
+    let targetDate = getSimulatedDate();
+    targetDate.setDate(targetDate.getDate() + diff);
+    
+    let dateStr = targetDate.toLocaleDateString("es-ES", { day: 'numeric', month: 'numeric', year: 'numeric' });
+    document.getElementById("day").innerText = (dayNames[currentViewDay] || currentViewDay) + " - " + dateStr;
 
     // Ocultar o mostrar el contenedor de agregar tarea
     let addTaskContainer = document.getElementById("add-task-container");
@@ -738,6 +1209,8 @@ function load() {
     loadRewards();
 
     updatePoints();
+    
+    updateStreakStatus();
 
 }
 
@@ -758,6 +1231,29 @@ function loadRewards() {
         document.getElementById("rewards");
 
     container.innerHTML = "";
+    
+    // Asegurar que el "Protector de racha" exista 
+    let protectorName = "Protector de Racha";
+    let hasProtector = rewards.some(r => r.name === protectorName);
+    
+    if (!hasProtector) {
+        // Añadir al principio
+        rewards.unshift({ name: protectorName, cost: 50 }); // Costo ejemplo 50
+    }
+
+    // Mostrar Estado de Escudos
+    if(activeStreakProtectors > 0) {
+        let statusDiv = document.createElement("div");
+        statusDiv.style.backgroundColor = "#d4edda";
+        statusDiv.style.color = "#155724";
+        statusDiv.style.padding = "10px";
+        statusDiv.style.marginBottom = "15px";
+        statusDiv.style.borderRadius = "5px";
+        statusDiv.style.textAlign = "center";
+        statusDiv.style.fontWeight = "bold";
+        statusDiv.innerText = "🛡️  TIENES " + activeStreakProtectors + " PROTECTOR(ES) DE RACHA ACTIVO(S)";
+        container.appendChild(statusDiv);
+    }
 
 
     rewards.forEach((r, index) => {
@@ -766,6 +1262,12 @@ function loadRewards() {
             document.createElement("div");
 
         div.className = "task";
+        
+        // Estilo especial para protector
+        if(r.name === protectorName) {
+            div.style.border = "2px solid #28a745";
+            div.style.backgroundColor = "#f0fff4";
+        }
 
         let textSpan = document.createElement("span");
         textSpan.innerText = (r.cost == 1 ? r.name + " - " + r.cost + " punto" : r.name + " - " + r.cost + " puntos") + " ";
@@ -781,22 +1283,47 @@ function loadRewards() {
 
             if (points >= r.cost) {
 
-                // Registrar en historial de recompensas
-                let now = new Date();
-                let record = {
-                    rewardName: r.name,
-                    cost: r.cost,
-                    date: now.toLocaleDateString(),
-                    time: now.toLocaleTimeString()
-                };
-                rewardHistory.push(record);
+                if(confirm(`¿Deseas canjear "${r.name}" por ${r.cost} puntos?`)) {
 
-                points -= r.cost;
+                    // LOGICA ESPECIFICA PARA PROTECTOR
+                    if(r.name === protectorName) {
+                        activeStreakProtectors++;
+                        points -= r.cost;
+                        
+                        // Registrar en historial como Item Especial
+                        let now = new Date();
+                        let record = {
+                            rewardName: "🛡️ " + r.name,
+                            cost: r.cost,
+                            date: now.toLocaleDateString(),
+                            time: now.toLocaleTimeString()
+                        };
+                        rewardHistory.push(record);
 
-                updatePoints();
-                saveData();
+                        updatePoints();
+                        saveData();
+                        loadRewards(); // Recargar para ver el escudo activo
+                        alert("¡PROTECTOR ACTIVADO! 🛡️\nTu racha está protegida por 1 día fallido.");
+                        return; // Salir para no ejecutar alerta genérica
+                    }
 
-                alert("Recompensa obtenida");
+                    // Registrar en historial de recompensas normal
+                    let now = new Date();
+                    let record = {
+                        rewardName: r.name,
+                        cost: r.cost,
+                        date: now.toLocaleDateString(),
+                        time: now.toLocaleTimeString()
+                    };
+                    rewardHistory.push(record);
+
+                    points -= r.cost;
+
+                    updatePoints();
+                    saveData();
+
+                    alert("Recompensa obtenida: " + r.name);
+                }
 
             }
 
@@ -811,20 +1338,24 @@ function loadRewards() {
 
         div.appendChild(btn);
 
-        let deleteBtn = document.createElement("button");
-        deleteBtn.innerText = "Eliminar";
-        deleteBtn.style.backgroundColor = "#ff4c4c"; 
-        deleteBtn.style.color = "white"; 
-        deleteBtn.style.border = "none";
-        
-        deleteBtn.onclick = function() {
-            if(confirm("¿Estás seguro de que deseas eliminar esta recompensa?")) {
-                rewards.splice(index, 1);
-                saveData();
-                loadRewards();
-            }
-        };
-        div.appendChild(deleteBtn);
+        // Boton Eliminar (No permitir eliminar el protector por defecto)
+        if(r.name !== protectorName) {
+            let deleteBtn = document.createElement("button");
+            deleteBtn.innerText = "Eliminar";
+            deleteBtn.style.backgroundColor = "#ff4c4c"; 
+            deleteBtn.style.color = "white"; 
+            deleteBtn.style.border = "none";
+            deleteBtn.style.marginLeft = "10px";
+            
+            deleteBtn.onclick = function() {
+                if(confirm("¿Estás seguro de que deseas eliminar esta recompensa?")) {
+                    rewards.splice(index, 1);
+                    saveData();
+                    loadRewards();
+                }
+            };
+            div.appendChild(deleteBtn);
+        }
 
         container.appendChild(div);
 
