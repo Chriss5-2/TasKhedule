@@ -21,6 +21,60 @@ let rewardHistory = [];
 
 let rewardsActive = true;
 
+let timeInputsVisible = false;
+
+function toggleTimeInputs() {
+    let container = document.getElementById("time-inputs-container");
+    let btn = document.getElementById("btn-set-time");
+    
+    // Si estaba oculto, mostrar
+    if (container.style.display === "none") {
+        container.style.display = "flex";
+        btn.innerText = "✖ Cancelar Horario";
+        btn.style.backgroundColor = "#dc3545";
+    } else {
+        // Ocultar y limpiar
+        container.style.display = "none";
+        btn.innerText = "🕑 Establecer Horario";
+        btn.style.backgroundColor = "#6c757d";
+        document.getElementById("new-task-start-time").value = "";
+        document.getElementById("new-task-end-time").value = "";
+        document.getElementById("task-duration-display").value = "";
+    }
+}
+
+function calculateDuration() {
+    let startInput = document.getElementById("new-task-start-time");
+    let endInput = document.getElementById("new-task-end-time");
+    let display = document.getElementById("task-duration-display");
+    
+    let start = startInput.value;
+    let end = endInput.value;
+    
+    if (start && end) {
+        let startTime = new Date(0, 0, 0, start.split(":")[0], start.split(":")[1]);
+        let endTime = new Date(0, 0, 0, end.split(":")[0], end.split(":")[1]);
+        
+        let diffMs = endTime - startTime;
+        
+        // Manejar cruce de medianoche (ej: 23:00 a 01:00)
+        if (diffMs < 0) {
+            diffMs += 24 * 60 * 60 * 1000;
+        }
+        
+        let diffHrs = Math.floor(diffMs / 3600000); 
+        let diffMins = Math.round((diffMs % 3600000) / 60000);
+        
+        let durationText = "";
+        if (diffHrs > 0) durationText += diffHrs + "h ";
+        if (diffMins > 0) durationText += diffMins + "m";
+        
+        display.value = durationText.trim();
+    } else {
+        display.value = "";
+    }
+}
+
 function saveData() {
     localStorage.setItem("rpg_points", points);
     localStorage.setItem("rpg_tasks", JSON.stringify(tasks));
@@ -200,6 +254,16 @@ function resetAll() {
 function addTask() {
     let input = document.getElementById("new-task-input");
     let taskName = input.value.trim();
+    
+    // Obtener valores de hora
+    let startTimeInput = document.getElementById("new-task-start-time");
+    let endTimeInput = document.getElementById("new-task-end-time");
+    let durationInput = document.getElementById("task-duration-display");
+
+    let startTime = startTimeInput ? startTimeInput.value : "";
+    let endTime = endTimeInput ? endTimeInput.value : "";
+    let duration = durationInput ? durationInput.value.trim() : "";
+
     let checkbox = document.getElementById("is-default-task");
     let isDefault = checkbox ? checkbox.checked : false;
 
@@ -207,10 +271,33 @@ function addTask() {
         if (!tasks[currentViewDay]) {
             tasks[currentViewDay] = [];
         }
-        // Guardar como objeto con estado completado y si es por defecto
-        tasks[currentViewDay].push({ name: taskName, completed: false, isDefault: isDefault });
+        // Guardar como objeto con estado completado, si es por defecto, horario y duración
+        tasks[currentViewDay].push({ 
+            name: taskName, 
+            completed: false, 
+            isDefault: isDefault,
+            startTime: startTime,
+            endTime: endTime,
+            duration: duration
+        });
+        
         input.value = "";
+        
+        // Reset Time UI
+        let timeContainer = document.getElementById("time-inputs-container");
+        let btn = document.getElementById("btn-set-time");
+        if(timeContainer.style.display === "flex") {
+             // Ocultar si estaba abierto y resetear
+             timeContainer.style.display = "none";
+             btn.innerText = "🕑 Establecer Horario";
+             btn.style.backgroundColor = "#6c757d";
+        }
+        document.getElementById("new-task-start-time").value = "";
+        document.getElementById("new-task-end-time").value = "";
+        document.getElementById("task-duration-display").value = "";
+        
         if (checkbox) checkbox.checked = false;
+        
         saveData();
         load();
     } else {
@@ -277,8 +364,22 @@ function showGeneralSchedule() {
                 // Manejar tanto string antiguo como objeto nuevo
                 let taskName = (typeof task === 'string') ? task : task.name;
                 let isCompleted = (typeof task === 'object' && task.completed);
+                let startTime = (typeof task === 'object' && task.startTime) ? task.startTime : "";
+                let endTime = (typeof task === 'object' && task.endTime) ? task.endTime : "";
+                let duration = (typeof task === 'object' && task.duration) ? task.duration : "";
                 
-                li.innerText = taskName;
+                let text = taskName;
+                if(startTime || endTime) {
+                    let timeText = "";
+                    if(startTime && endTime) timeText = ` (${startTime} - ${endTime})`;
+                    else if(startTime) timeText = ` (> ${startTime})`;
+                    else if(endTime) timeText = ` (< ${endTime})`;
+                    text += timeText;
+                } else if(duration) {
+                     text += ` (${duration})`;
+                }
+                
+                li.innerText = text;
                 if (isCompleted) {
                     li.style.textDecoration = "line-through";
                     li.style.color = "green";
@@ -494,6 +595,8 @@ function load() {
         let taskName = (typeof taskObj === 'string') ? taskObj : taskObj.name;
         let isCompleted = (typeof taskObj === 'object' && taskObj.completed);
         let isDefault = (typeof taskObj === 'object' && taskObj.isDefault);
+        let startTime = (typeof taskObj === 'object' && taskObj.startTime) ? taskObj.startTime : "";
+        let endTime = (typeof taskObj === 'object' && taskObj.endTime) ? taskObj.endTime : "";
 
         let div =
             document.createElement("div");
@@ -511,20 +614,61 @@ function load() {
             div.appendChild(dot);
         }
 
-        let textSpan = document.createElement("span");
-        textSpan.innerText = taskName + " ";
+        let contentDiv = document.createElement("div");
+        contentDiv.style.textAlign = "left";
+        contentDiv.style.width = "100%";
+        
+        let nameDiv = document.createElement("div");
+        nameDiv.innerText = taskName;
+        nameDiv.style.fontWeight = "bold";
         if (isCompleted) {
-            textSpan.style.textDecoration = "line-through";
-            textSpan.style.color = "#155724";
+            nameDiv.style.textDecoration = "line-through";
+            nameDiv.style.color = "#155724";
         }
-        div.appendChild(textSpan);
+        contentDiv.appendChild(nameDiv);
+
+        let timeText = "";
+        
+        // Prioridad: Mostrar horario si existe, sino mostrar duración
+        if (startTime || endTime) {
+             if(startTime && endTime) timeText = `🕒 ${startTime} - ${endTime}`;
+             else if(startTime) timeText = `🕒 Desde ${startTime}`;
+             else if(endTime) timeText = `🕒 Hasta ${endTime}`;
+             
+             // Si hay duración calculada o manual, agregarla
+             if(taskObj.duration) {
+                 timeText += ` (${taskObj.duration})`;
+             }
+        } else if (taskObj.duration) {
+            timeText = `⏱️ ${taskObj.duration}`;
+        }
+
+        if (timeText) {
+            let timeDiv = document.createElement("div");
+            timeDiv.style.fontSize = "0.85em";
+            timeDiv.style.color = "#666";
+            timeDiv.style.marginTop = "2px";
+            timeDiv.innerText = timeText;
+            if (isCompleted) {
+                 timeDiv.style.textDecoration = "line-through";
+            }
+            contentDiv.appendChild(timeDiv);
+        }
+        
+        div.appendChild(contentDiv);
+
+        // Contenedor de botones
+        let btnContainer = document.createElement("div");
+        btnContainer.style.marginTop = "10px";
+        btnContainer.style.display = "flex";
+        btnContainer.style.gap = "5px";
+        btnContainer.style.justifyContent = "center";
 
         if (isToday) {
             if (!isCompleted) {
                 let btn = document.createElement("button");
                 btn.innerText = "Completar";
-                btn.style.marginRight = "5px";
-
+                // btn estilos... 
                 btn.onclick = function () {
                     // Registrar historial
                     let now = new Date();
@@ -549,7 +693,7 @@ function load() {
                     saveData();
                     load(); // Recargar para actualizar UI
                 };
-                div.appendChild(btn);
+                btnContainer.appendChild(btn);
             } else {
                 // Botón Repetir
                 let btn = document.createElement("button");
@@ -565,7 +709,7 @@ function load() {
                         load();
                     }
                 };
-                div.appendChild(btn);
+                btnContainer.appendChild(btn);
             }
         }
 
@@ -582,7 +726,9 @@ function load() {
                 load();
             }
         };
-        div.appendChild(deleteBtn);
+        btnContainer.appendChild(deleteBtn);
+
+        div.appendChild(btnContainer);
 
         container.appendChild(div);
 

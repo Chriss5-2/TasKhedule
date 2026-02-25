@@ -45,6 +45,16 @@
             <div style="display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap;">
                 <input type="text" id="new-task-input" placeholder="Nombre de la nueva tarea" style="padding: 8px; width: 200px; border-radius: 5px; border: 1px solid #ccc;">
                 
+                <input type="text" id="task-duration-display" placeholder="Duración (ej. 30m)" style="padding: 8px; width: 120px; border-radius: 5px; border: 1px solid #ccc; background-color: white; text-align: center;">
+
+                <button onclick="toggleTimeInputs()" id="btn-set-time" style="cursor: pointer; padding: 8px; font-size: 14px; background-color: #6c757d; color: white; border: none; border-radius: 5px;">🕑 Establecer Horario</button>
+
+                <div id="time-inputs-container" style="display: none; align-items: center; gap: 5px; border: 1px solid #ddd; padding: 5px; border-radius: 5px; background-color: white;">
+                    <input type="time" id="new-task-start-time" onchange="calculateDuration()" style="padding: 5px; border-radius: 5px; border: 1px solid #ccc;">
+                    <span>a</span>
+                    <input type="time" id="new-task-end-time" onchange="calculateDuration()" style="padding: 5px; border-radius: 5px; border: 1px solid #ccc;">
+                </div>
+
                 <div style="display: flex; align-items: center; gap: 5px;">
                     <input type="checkbox" id="is-default-task" style="cursor: pointer;">
                     <label for="is-default-task" style="font-size: 14px; cursor: pointer;">Por defecto</label>
