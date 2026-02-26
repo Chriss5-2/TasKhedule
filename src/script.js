@@ -1682,3 +1682,93 @@ function loadRewards() {
 
 loadData();
 load();
+
+// --- Token Export/Import Logic ---
+
+function generateToken() {
+    const data = {
+        tasks: JSON.parse(localStorage.getItem('rpg_tasks') || JSON.stringify(initialTasks)),
+        rewards: JSON.parse(localStorage.getItem('rpg_rewards') || '[]'),
+        points: parseInt(localStorage.getItem('rpg_points') || '0'),
+        streak: parseInt(localStorage.getItem('rpg_streak') || '0'),
+        lastLogin: localStorage.getItem('rpg_last_login') || '',
+        taskHistory: JSON.parse(localStorage.getItem('rpg_task_history') || '[]'),
+        rewardHistory: JSON.parse(localStorage.getItem('rpg_reward_history') || '[]')
+    };
+    return btoa(encodeURIComponent(JSON.stringify(data)));
+}
+
+function showExportTokenModal() {
+    const modal = document.getElementById('token-modal');
+    const title = document.getElementById('token-modal-title');
+    const desc = document.getElementById('token-modal-desc');
+    const textArea = document.getElementById('token-area');
+    const actionBtn = document.getElementById('token-action-btn');
+
+    title.innerText = "Exportar Token";
+    desc.innerText = "Copia este token para importar tus datos en otro dispositivo.";
+    textArea.value = generateToken();
+    textArea.readOnly = true;
+    
+    actionBtn.innerText = "Copiar Token";
+    actionBtn.onclick = copyToken;
+    
+    modal.style.display = "flex";
+}
+
+function showImportTokenModal() {
+    const modal = document.getElementById('token-modal');
+    const title = document.getElementById('token-modal-title');
+    const desc = document.getElementById('token-modal-desc');
+    const textArea = document.getElementById('token-area');
+    const actionBtn = document.getElementById('token-action-btn');
+
+    title.innerText = "Importar Token";
+    desc.innerText = "Pega aquí el token generado en tu otro dispositivo.";
+    textArea.value = "";
+    textArea.readOnly = false;
+    
+    actionBtn.innerText = "Importar Datos";
+    actionBtn.onclick = importDataFromToken;
+    
+    modal.style.display = "flex";
+}
+
+function closeTokenModal() {
+    document.getElementById('token-modal').style.display = "none";
+}
+
+function copyToken() {
+    const textArea = document.getElementById('token-area');
+    textArea.select();
+    document.execCommand('copy');
+    alert("Token copiado al portapapeles");
+}
+
+function importDataFromToken() {
+    const token = document.getElementById('token-area').value;
+    if (!token) return alert("Por favor, introduce un token.");
+
+    try {
+        const jsonString = decodeURIComponent(atob(token));
+        const data = JSON.parse(jsonString);
+
+        if (!data.tasks) throw new Error("Datos inválidos");
+
+        if (confirm("Esto sobrescribirá tus datos actuales. ¿Estás seguro?")) {
+            localStorage.setItem('rpg_tasks', JSON.stringify(data.tasks));
+            localStorage.setItem('rpg_rewards', JSON.stringify(data.rewards || []));
+            localStorage.setItem('rpg_points', (data.points || 0).toString());
+            localStorage.setItem('rpg_streak', (data.streak || 0).toString());
+            if (data.lastLogin) localStorage.setItem('rpg_last_login', data.lastLogin);
+            localStorage.setItem('rpg_task_history', JSON.stringify(data.taskHistory || []));
+            localStorage.setItem('rpg_reward_history', JSON.stringify(data.rewardHistory || []));
+
+            alert("Datos importados correctamente. La página se recargará.");
+            location.reload();
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Error al importar el token. Verifica que sea válido.");
+    }
+}

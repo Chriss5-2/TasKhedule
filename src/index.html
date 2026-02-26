@@ -37,6 +37,12 @@
                 <button onclick="goToHome(); toggleSidebar()" class="sidebar-btn">🏠 Inicio</button>
                 <input type="file" id="import-csv-input" accept=".csv" style="display: none;" onchange="importCSV(this)">
                 <button onclick="document.getElementById('import-csv-input').click(); toggleSidebar()" class="sidebar-btn">📂 Importar CSV</button>
+                
+                <hr style="margin: 10px 0; border: 0; border-top: 1px solid rgba(255,255,255,0.2);">
+                <button onclick="showExportTokenModal(); toggleSidebar()" class="sidebar-btn">📤 Exportar a Token</button>
+                <button onclick="showImportTokenModal(); toggleSidebar()" class="sidebar-btn">📥 Importar por Token</button>
+                <hr style="margin: 10px 0; border: 0; border-top: 1px solid rgba(255,255,255,0.2);">
+
                 <button onclick="showGeneralSchedule(); toggleSidebar()" class="sidebar-btn">📅 Cronograma General</button>
                 <button onclick="showHistory(); toggleSidebar()" class="sidebar-btn">📜 Historial</button>
                 <button onclick="document.getElementById('calendar-date-input').showPicker(); toggleSidebar()" class="sidebar-btn" style="background: linear-gradient(135deg, #FF9800, #F57C00) !important; border: none; color: white;">📅 Calendario</button>
@@ -209,6 +215,19 @@
                 </div>
             </div>
 
+        </div>
+    </div>
+
+    <div id="token-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeTokenModal()">&times;</span>
+            <h2 id="token-modal-title">Gestión de Token</h2>
+            <p id="token-modal-desc">Copia este token para importar tus datos en otro dispositivo.</p>
+            <textarea id="token-area" rows="6" style="width: 100%; margin-bottom: 10px; padding: 10px; border-radius: 5px; resize: none;"></textarea>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button id="token-action-btn" onclick="copyToken()">Copiar Token</button>
+                <button onclick="closeTokenModal()">Cerrar</button>
+            </div>
         </div>
     </div>
 
