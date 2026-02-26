@@ -84,6 +84,22 @@ h1, h2, h3, h4 {
     font-size: 0.9em;
 }
 
+
+.import-btn-option {
+    padding: 8px 12px;
+    border: none;
+    border-radius: 5px;
+    color: white;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: transform 0.2s;
+}
+
+.import-btn-option:hover {
+    transform: scale(1.05);
+    filter: brightness(1.1);
+}
+
 /* Sidebar Styles */
 .sidebar {
     position: fixed;
