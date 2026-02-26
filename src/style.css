@@ -31,6 +31,132 @@ h1, h2, h3, h4 {
     font-weight: 600;
 }
 
+/* Sidebar Styles */
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: -280px; /* Hidden by default */
+    width: 250px;
+    height: 100vh;
+    background: #151922; /* Fallback solid color for better contrast */
+    background: rgba(21, 25, 34, 0.98);
+    backdrop-filter: blur(15px);
+    box-shadow: 5px 0 25px rgba(0, 0, 0, 0.8);
+    transition: left 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+    z-index: 10000;
+    padding: 20px;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar.active {
+    left: 0;
+}
+
+.sidebar h2 {
+    color: var(--accent-blue);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding-bottom: 15px;
+    margin-top: 50px; /* Space for close button */
+    margin-bottom: 20px;
+    font-size: 1.5rem;
+    padding-left: 10px;
+}
+
+.sidebar-btn {
+    display: flex !important;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    margin-bottom: 12px;
+    text-align: left;
+    padding: 12px 20px;
+    font-size: 1rem;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 12px;
+    transition: all 0.2s ease;
+    color: var(--text-secondary);
+}
+
+.sidebar-btn:hover {
+    background: rgba(255,255,255,0.08);
+    border-color: var(--accent-blue);
+    color: white;
+    transform: translateX(5px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.close-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    font-size: 2rem;
+    line-height: 1;
+    background: transparent !important;
+    border: none;
+    color: var(--text-secondary);
+    box-shadow: none;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.close-btn:hover {
+    color: white;
+    background: rgba(255,255,255,0.1) !important;
+    transform: rotate(90deg);
+}
+
+/* Sidebar Overlay */
+#sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0,0,0,0.6);
+    z-index: 9999; /* Below sidebar, above content */
+    display: none;
+    backdrop-filter: blur(3px);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+#sidebar-overlay.active {
+    display: block;
+    opacity: 1;
+}
+
+/* Menu Toggle Button */
+#menu-toggle {
+    background: linear-gradient(135deg, #2a2d35, #1e2025);
+    border: 1px solid rgba(255,255,255,0.1);
+    font-size: 1rem;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-radius: 30px;
+    color: var(--text-primary);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    transition: all 0.3s ease;
+}
+
+#menu-toggle:hover {
+    background: #333;
+    border-color: var(--accent-blue);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(0,0,0,0.4);
+}
+
 /* Glassmorphism Input Styles */
 input[type="text"], 
 input[type="number"], 
@@ -247,4 +373,363 @@ button[onclick*="showHistory"], button[onclick*="showGeneral"] {
 }
 
 .history-item { background: var(--card-bg); padding: 10px; margin-bottom: 10px; border-radius: 8px; border: var(--glass-border); color: var(--text-primary); }
+
+/* --- RESPONSIVE LAYOUT & NEW CLASSES --- */
+
+/* Top Controls */
+.top-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 10px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.dev-mode-container {
+    margin-bottom: 5px;
+}
+
+.dev-mode-label {
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+/* Dev Controls */
+#dev-controls {
+    width: 100%;
+    margin-top: 10px;
+    padding: 10px;
+    border: 1px dashed var(--accent-red);
+    background: rgba(50, 0, 0, 0.3);
+    border-radius: 8px;
+}
+
+.dev-tools-wrapper {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.dev-btn-next { background-color: purple !important; padding: 5px 10px !important; font-size: 12px !important; }
+.dev-btn-date { background-color: #007bff !important; padding: 5px 10px !important; font-size: 12px !important; }
+.hidden-date-input { width: 0; height: 0; opacity: 0; position: absolute; }
+#simulated-date-display { font-size: 11px; color: #ff6b6b; margin-top: 5px; font-weight: bold; text-align: center; }
+
+/* Stats Container */
+.stats-container {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+/* Day View Controls */
+.day-controls {
+    margin: 20px auto;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    align-items: center;
+    max-width: 800px;
+}
+
+.day-selector-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.day-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+/* Add Task Container */
+#add-task-container {
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: center;
+    width: 100%; /* Asegurar que ocupe todo el ancho para poder centrar el hijo */
+}
+
+.add-task-wrapper {
+    background: var(--card-bg);
+    border: var(--glass-border);
+    padding: 15px;
+    border-radius: 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto; /* Refuerzo para centrado si el flex falla o en block */
+}
+
+.add-task-wrapper input[type="text"] {
+    flex-grow: 1;
+    min-width: 200px;
+}
+
+.schedule-inputs {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+}
+
+.time-input-container {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+}
+
+#task-duration-value { width: 70px; text-align: center; }
+#task-duration-unit { width: 60px; }
+.time-separator { font-weight: bold; }
+
+.default-check-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.btn-add {
+    padding: 10px 25px;
+    font-size: 0.9rem;
+}
+
+/* Rewards Section */
+.add-reward-wrapper {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+
+#toggle-rewards-btn {
+    font-size: 0.8rem;
+    padding: 5px 10px;
+    margin-left: 10px;
+    vertical-align: middle;
+}
+
+/* History View */
+.history-controls {
+    margin-bottom: 20px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+#history-content {
+    max-width: 90%;
+    margin: 0 auto;
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.history-column {
+    flex: 1;
+    min-width: 300px;
+    max-width: 500px;
+}
+
+.history-title {
+    text-align: center;
+    padding-bottom: 5px;
+    margin-bottom: 15px;
+}
+.task-title { border-bottom: 2px solid #28a745; }
+.reward-title { border-bottom: 2px solid #ffc107; }
+
+/* Grid Views */
+#general-schedule-grid, #general-rewards-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 15px;
+    padding: 20px;
+}
+
+/* General View Rewards */
+.reward-card-general {
+    flex: 1 1 200px;
+    max-width: 300px;
+    justify-content: center;
+    /* Styles removed from JS inline */
+}
+
+.protector-card {
+    border-color: #28a745 !important;
+    background: linear-gradient(135deg, rgba(40, 167, 69, 0.1), rgba(0,0,0,0.2)) !important;
+    box-shadow: 0 0 15px rgba(40, 167, 69, 0.2) !important;
+}
+
+.reward-title-general {
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding-bottom: 5px;
+    margin-bottom: 5px;
+    font-size: 1.1rem;
+    margin-top: 0;
+    color: var(--text-primary);
+}
+
+.reward-cost-general {
+    font-weight: bold;
+    color: var(--accent-blue);
+    margin: 0;
+}
+
+/* --- MOBILE RESPONSIVE MEDIA QUERIES --- */
+
+@media (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+
+    h1 { font-size: 1.8rem; margin: 10px 0; }
+    h2 { font-size: 1.4rem; }
+    h3 { font-size: 1.1rem; }
+
+    /* Top Controls Mobile */
+    .top-controls {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .action-buttons {
+        justify-content: center;
+        width: 100%;
+        gap: 8px;
+    }
+
+    .action-buttons button {
+        flex: 1 1 auto;
+        font-size: 0.7rem;
+        padding: 8px;
+    }
+
+    /* Add Task Wrapper Vertical Stack */
+    .add-task-wrapper {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 15px;
+    }
+
+    .add-task-wrapper input[type="text"] {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .schedule-inputs {
+        width: 100%;
+        flex-direction: row;
+        justify-content: space-between;
+        gap: 10px;
+    }
+    
+    #schedule-type-selector {
+        flex: 1;
+    }
+
+    .time-input-container {
+        flex: 1;
+        justify-content: flex-end;
+    }
+
+    .default-check-wrapper {
+        justify-content: center;
+        padding: 5px 0;
+    }
+
+    .btn-add {
+        width: 100%;
+        padding: 12px;
+        font-size: 1rem;
+    }
+
+    /* Tasks Grid */
+    #tasks {
+        grid-template-columns: 1fr; /* Single column on mobile */
+        gap: 15px;
+        padding: 10px 0;
+    }
+
+    /* Cards Mobile */
+    .task, .day-card {
+        padding: 15px;
+        border-radius: 12px;
+    }
+
+    /* Rewards Mobile */
+    #rewards {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); /* Smaller cards */
+        gap: 10px;
+        padding: 10px 0;
+    }
+
+    .add-reward-wrapper {
+        flex-direction: column;
+    }
+    .add-reward-wrapper input {
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .add-reward-wrapper button {
+        width: 100%;
+    }
+
+    /* History Columns */
+    .history-column {
+        min-width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .schedule-inputs {
+        flex-direction: column;
+    }
+    
+    #schedule-type-selector, .time-input-container {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .day-selector-group {
+        flex-direction: column;
+    }
+    
+    .day-actions button {
+        width: 100%;
+        padding: 10px;
+    }
+}
+
 
