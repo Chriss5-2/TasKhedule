@@ -59,6 +59,7 @@
                 <option value="Saturday">Sábado</option>
                 <option value="Sunday">Domingo</option>
             </select>
+            <button onclick="goToToday()">Ir a Día Actual</button>
             <button onclick="resetDay()">Reiniciar Día</button>
             <button onclick="deleteAllTasks()">Borrar Tareas</button>
             <button onclick="resetAll()">Reiniciar Todo</button>
@@ -71,20 +72,28 @@
                 <input type="text" id="new-task-input" placeholder="Nombre de la nueva tarea">
                 
                 <!-- Reemplazo de input de texto por numero + selector -->
-                <div style="display: flex; gap: 5px; align-items: center;">
-                    <input type="number" id="task-duration-value" placeholder="Duración" min="1" style="width: 80px; text-align: center;">
-                    <select id="task-duration-unit">
-                        <option value="m">Min</option>
-                        <option value="h">Hrs</option>
+                
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
+                    <select id="schedule-type-selector" onchange="toggleScheduleInputs()" style="padding: 5px; border-radius: 5px; font-size: 12px;">
+                        <option value="free">Horario Libre (Solo Duración)</option>
+                        <option value="fixed">Horario Fijo (Inicio - Fin)</option>
                     </select>
-                </div>
 
-                <button onclick="toggleTimeInputs()" id="btn-set-time">🕑 Establecer Horario</button>
+                    <!-- Container: Horario Libre (Duración) -->
+                    <div id="free-schedule-container" style="display: flex; gap: 5px; align-items: center;">
+                        <input type="number" id="task-duration-value" placeholder="Duración" min="1" style="width: 80px; text-align: center;">
+                        <select id="task-duration-unit">
+                            <option value="m">Min</option>
+                            <option value="h">Hrs</option>
+                        </select>
+                    </div>
 
-                <div id="time-inputs-container" style="display: none; align-items: center; gap: 5px; border: var(--glass-border); padding: 5px; border-radius: 5px;">
-                    <input type="time" id="new-task-start-time" onchange="calculateDuration()">
-                    <span>a</span>
-                    <input type="time" id="new-task-end-time" onchange="calculateDuration()">
+                    <!-- Container: Horario Fijo (Start - End) -->
+                    <div id="fixed-schedule-container" style="display: none; align-items: center; gap: 5px; border: var(--glass-border); padding: 5px; border-radius: 5px;">
+                        <input type="time" id="new-task-start-time" onchange="calculateDuration()">
+                        <span>a</span>
+                        <input type="time" id="new-task-end-time" onchange="calculateDuration()">
+                    </div>
                 </div>
 
                 <div style="display: flex; align-items: center; gap: 5px;">

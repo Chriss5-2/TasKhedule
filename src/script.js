@@ -23,29 +23,37 @@ let rewardsActive = true;
 
 let timeInputsVisible = false;
 
-function toggleTimeInputs() {
-    let container = document.getElementById("time-inputs-container");
-    let btn = document.getElementById("btn-set-time");
+function toggleScheduleInputs() {
+    let selector = document.getElementById("schedule-type-selector");
+    let freeContainer = document.getElementById("free-schedule-container");
+    let fixedContainer = document.getElementById("fixed-schedule-container");
     
-    // Si estaba oculto, mostrar
-    if (container.style.display === "none") {
-        container.style.display = "flex";
-        btn.innerText = "✖ Cancelar Horario";
-        btn.style.backgroundColor = "#dc3545";
-    } else {
-        // Ocultar y limpiar
-        container.style.display = "none";
-        btn.innerText = "🕑 Establecer Horario";
-        btn.style.backgroundColor = "#6c757d";
-        document.getElementById("new-task-start-time").value = "";
-        document.getElementById("new-task-end-time").value = "";
+    // Safety check if elements don't exist yet (simpler loading handling)
+    if(!selector || !freeContainer || !fixedContainer) return;
+
+    if (selector.value === "fixed") {
+        freeContainer.style.display = "none";
+        fixedContainer.style.display = "flex";
         
-        let durVal = document.getElementById("task-duration-value");
-        let durUnit = document.getElementById("task-duration-unit");
-        if(durVal) durVal.value = "";
-        if(durUnit) durUnit.value = "m"; // Default to minutes
+        // When switching to fixed, we might want to calculate duration if times are already there
+        // (though usually they are empty when switching mode)
+        calculateDuration();
+    } else {
+        freeContainer.style.display = "flex";
+        fixedContainer.style.display = "none";
+        
+        // Clear times when switching back to free mode
+        let start = document.getElementById("new-task-start-time");
+        if(start) start.value = "";
+        let end = document.getElementById("new-task-end-time");
+        if(end) end.value = "";
+        
+        // Not clearing duration values as user might want to keep what they typed
+        // or re-type it. If we clear, we lose context if they switch back and forth.
     }
 }
+
+// removed duplicate toggleScheduleInputs
 
 function calculateDuration() {
     // Calculo de duración basado en start/end time
@@ -298,6 +306,10 @@ function toggleDevMode() {
         
         // Resetear simulación de tiempo
         simulatedDayOffset = 0;
+
+        // Limpiar historial de dev mode para que la próxima sesión sea fresca
+        devTaskHistory = {};
+        localStorage.removeItem("dev_rpg_task_completion_history");
         
         // UI Updates
         if(controls) controls.style.display = "none";
@@ -776,7 +788,29 @@ function addTask() {
     let durUnit = durationUnitSelect ? durationUnitSelect.value : "m";
     
     let duration = "";
-    if (durVal !== "") {
+    
+    // Si tenemos horario fijo, calculamos y formateamos la duración específicamente
+    if (startTime && endTime) {
+        let s = new Date(0, 0, 0, startTime.split(":")[0], startTime.split(":")[1]);
+        let e = new Date(0, 0, 0, endTime.split(":")[0], endTime.split(":")[1]);
+        let diffMs = e - s;
+        if (diffMs < 0) diffMs += 24 * 60 * 60 * 1000; // Cruce de medianoche
+        
+        let totalMinutes = Math.round(diffMs / 60000);
+        
+        if (totalMinutes <= 60) {
+            duration = `${totalMinutes}min`;
+        } else {
+            let h = Math.floor(totalMinutes / 60);
+            let m = totalMinutes % 60;
+            if (m === 0) {
+                duration = `${h}hrs`;
+            } else {
+                duration = `${h}hrs, ${m}min`;
+            }
+        }
+    } else if (durVal !== "") {
+        // Modo manual (Horario Libre)
         duration = durVal + durUnit;
     }
 
@@ -799,15 +833,9 @@ function addTask() {
         
         input.value = "";
         
-        // Reset Time UI
-        let timeContainer = document.getElementById("time-inputs-container");
-        let btn = document.getElementById("btn-set-time");
-        if(timeContainer && timeContainer.style.display === "flex") {
-             // Ocultar si estaba abierto y resetear
-             timeContainer.style.display = "none";
-             btn.innerText = "🕑 Establecer Horario";
-             btn.style.backgroundColor = "#6c757d";
-        }
+        // Reset Time UI (Legacy cleanup & Current fields)
+        // No need to reset visibility mode (keep current user choice)
+
         if(startTimeInput) startTimeInput.value = "";
         if(endTimeInput) endTimeInput.value = "";
         
@@ -973,6 +1001,11 @@ function goToDay(day) {
     currentViewDay = day;
     document.getElementById("day-selector").value = day;
     load();
+}
+
+function goToToday() {
+    let today = getDay(); // Obtiene el día actual real (o simulado si dev mode)
+    goToDay(today);
 }
 
 function goToPreviousView() {
@@ -1212,6 +1245,8 @@ function load() {
                         date: now.toLocaleDateString(),
                         time: now.toLocaleTimeString()
                     };
+                    taskHistory.push(record);
+
                     // Registrar puntos variables
                     let pts = 2; // Default (<= 1 hr o sin duración)
                     let taskItem = tasks[currentViewDay][index];
