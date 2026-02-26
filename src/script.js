@@ -970,20 +970,28 @@ function addTask() {
 
     let checkbox = document.getElementById("is-default-task");
     let isDefault = checkbox ? checkbox.checked : false;
+    let targetDateStr = getDateForViewDay(currentViewDay);
 
     if (taskName !== "") {
         if (!tasks[currentViewDay]) {
             tasks[currentViewDay] = [];
         }
         // Guardar como objeto con estado completado, si es por defecto, horario y duración
-        tasks[currentViewDay].push({ 
+        // Y AHORA FECHA ESPECÍFICA para tareas puntuales
+        let newTask = { 
             name: taskName, 
             completed: false, 
             isDefault: isDefault,
             startTime: startTime,
             endTime: endTime,
             duration: duration
-        });
+        };
+        
+        if (!isDefault) {
+            newTask.date = targetDateStr;
+        }
+        
+        tasks[currentViewDay].push(newTask);
         
         // input.value = ""; // Removed: addTask should probably not auto-clear if we have a clear button? Or yes? 
         // User workflow: Add -> Clear -> Add Next? Or Add -> Keep Form Open?
@@ -1254,6 +1262,31 @@ function clearHistory() {
 }
 
 
+function getDateForViewDay(viewDayName) {
+    if (isCalendarMode && calendarModeDate) {
+        let y = calendarModeDate.getFullYear();
+        let m = String(calendarModeDate.getMonth() + 1).padStart(2, '0');
+        let d = String(calendarModeDate.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    let baseDate = getSimulatedDate();
+    let daysMap = { "Sunday": 0, "Monday": 1, "Tuesday": 2, "Wednesday": 3, "Thursday": 4, "Friday": 5, "Saturday": 6 };
+    let currentDayIndex = baseDate.getDay();
+    let targetDayIndex = daysMap[viewDayName];
+    
+    // Calcular diferencia en días dentro de la misma semana
+    let diff = targetDayIndex - currentDayIndex;
+    
+    let targetDate = new Date(baseDate);
+    targetDate.setDate(baseDate.getDate() + diff);
+    
+    let y = targetDate.getFullYear();
+    let m = String(targetDate.getMonth() + 1).padStart(2, '0');
+    let d = String(targetDate.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
 function getSimulatedDayName() {
     let d = getSimulatedDate();
     return d.toLocaleDateString("en-US", { weekday: "long" });
@@ -1267,9 +1300,14 @@ function load() {
     
     let currentViewArg = currentViewDay;
     let trueTodayName = getSimulatedDayName();
+    let currentViewDateStr = getDateForViewDay(currentViewDay);
     
     // Si isCalendarMode es true, NO permitimos completar NUNCA.
     // Si isCalendarMode es false, permitimos completar SOLO si currentViewDay == trueTodayName.
+    // REFINAMIENTO: Si estamos viendo "Lunes" pero hoy es "Martes", no deberíamos poder completar tareas del Lunes (pasado)
+    // O si. La lógica original permitía completar si currentViewDay == getDay().
+    // getDay() devuelve el día simulado actual. 
+    // Así que solo permite completar si estás viendo el día de HOY.
     
     let canComplete = !isCalendarMode && (currentViewArg === trueTodayName);
 
@@ -1335,7 +1373,25 @@ function load() {
     // Si estaba cerrado, sigue cerrado. Si estaba abierto (agregando varias tareas), sigue abierto.
     // Solo al inicio de la app (carga inicial de script) debería estar cerrado por CSS/HTML default.
 
-    let list = tasks[currentViewDay] || [];
+    let rawList = tasks[currentViewDay] || [];
+    
+    // FILTRADO CON INDICE ORIGINAL: Mapeamos primero para conservar el índice real
+    let displayList = rawList.map((t, i) => ({ task: t, origIndex: i }))
+        .filter(item => {
+            let t = item.task;
+            let isDefault = (typeof t === 'object' && t.isDefault);
+            let tDate = (typeof t === 'object' && t.date);
+            
+            // Lógica de visualización:
+            // 1. Recurrentes (isDefault=true) -> SIEMPRE VISIBLES
+            // 2. Con fecha específica -> Solo si coincide con viewDate
+            // 3. Sin fecha y no recurrentes (Legacy) -> VISIBLES (Para no perderlas)
+            
+            if (isDefault) return true;
+            if (tDate) return tDate === currentViewDateStr; 
+            return true; 
+        });
+
 
     let container =
         document.getElementById("tasks");
@@ -1344,7 +1400,9 @@ function load() {
     container.innerHTML = "";
 
 
-    list.forEach((taskObj, index) => {
+    displayList.forEach((item) => {
+        let taskObj = item.task;
+        let originalIndex = item.origIndex;
 
         // Asegurar que taskObj sea un objeto
         let taskName = (typeof taskObj === 'string') ? taskObj : taskObj.name;
@@ -1423,28 +1481,13 @@ function load() {
         // 2. Si NO es modo calendario y es hoy: Mostrar Completar.
         
         if (!isCalendarMode && (currentViewDay === getSimulatedDayName())) { 
-             // getSimulatedDayName helper needed or use getSimulatedDate
-             // Simplificación: Comparamos con el día "real/simulado" actual, no con el del selector.
-             // Pero 'load()' verifica 'isToday' basado en currentViewDay === today.
-             // El problema es que getDay() ahora devuelve el día del calendario si está activo.
-             // Necesitamos separar "Día de la vista" de "Día de Hoy".
-             
-             // Restauramos lógica original dentro del if isToday que ya existía en load()
-             // isToday se calculaba al inicio de load(): let today = getDay(); let isToday = (currentViewDay === today);
-             // Con mi cambio a getDay(), 'today' será la fecha calendario.
-             // Así que isToday será true si el selector coincide.
-             // Pero queremos bloquear completar en modo calendario.
-             
-             // Bloqueo explícito:
-             if(true) { // Placeholder para mantener estructura, la lógica real está abajo
-             
+             if(true) { 
                 if (!isCompleted) {
                     let btn = document.createElement("button");
                     btn.innerText = "Completar";
-                    // ...
+
                     btn.onclick = function () {
-                        // ... (código existente de completar) ...
-                         // Registrar historial
+                        // Registrar historial
                         let now = new Date();
                         let record = {
                             taskName: taskName,
@@ -1456,7 +1499,7 @@ function load() {
 
                         // Registrar puntos variables
                         let pts = 2; // Default (<= 1 hr o sin duración)
-                        let taskItem = tasks[currentViewDay][index];
+                        let taskItem = tasks[currentViewDay][originalIndex];
                         if(typeof taskItem === 'object' && taskItem.duration) {
                              pts = calculateTaskPoints(taskItem.duration);
                         }
@@ -1464,10 +1507,10 @@ function load() {
                         points += pts;
                         
                         // Registrar historial
-                        if (typeof tasks[currentViewDay][index] === 'string') {
-                            tasks[currentViewDay][index] = { name: tasks[currentViewDay][index], completed: true };
+                        if (typeof tasks[currentViewDay][originalIndex] === 'string') {
+                            tasks[currentViewDay][originalIndex] = { name: tasks[currentViewDay][originalIndex], completed: true };
                         } else {
-                            tasks[currentViewDay][index].completed = true;
+                            tasks[currentViewDay][originalIndex].completed = true;
                         }
 
                         // Verificar si se han completado TODAS las tareas por defecto del dia actual
@@ -1492,7 +1535,7 @@ function load() {
                     btn.className = "btn-warning";
                     btn.onclick = function () {
                         if(confirm("¿Quieres repetir esta tarea? Se volverá a habilitar y podrás completarla de nuevo.")) {
-                            tasks[currentViewDay][index].completed = false;
+                            tasks[currentViewDay][originalIndex].completed = false;
                             saveData();
                             load();
                         }
@@ -1501,8 +1544,7 @@ function load() {
                 }
              }
         } else if (isCalendarMode) {
-            // Modo espectador: No botones de acción de estado
-            // Solo mensaje informativo opcional? No, dejar limpio.
+            // Modo espectador
         }
 
         let deleteBtn = document.createElement("button");
@@ -1511,7 +1553,7 @@ function load() {
         
         deleteBtn.onclick = function() {
             if(confirm("¿Estás seguro de que deseas eliminar esta tarea?")) {
-                tasks[currentViewDay].splice(index, 1);
+                tasks[currentViewDay].splice(originalIndex, 1);
                 saveData();
                 load();
             }
