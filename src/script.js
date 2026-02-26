@@ -875,10 +875,13 @@ function resetAll() {
         activeStreakProtectors = 0;
         taskHistory = [];
         rewardHistory = []; 
+        goToToday();
         saveData();
         updatePoints();
         updateStreakDisplay();
-        load();
+        
+        // Simular clic en "Ir a día actual" para refrescar la vista completamente sin recargar
+        
         
         alert("El sistema se ha reiniciado por completo.");
     }
@@ -1728,14 +1731,101 @@ function showImportTokenModal() {
     textArea.value = "";
     textArea.readOnly = false;
     
-    actionBtn.innerText = "Importar Datos";
-    actionBtn.onclick = importDataFromToken;
+    // Ensure cleanup of previous dynamic buttons
+    const container = actionBtn.parentElement;
+    const extraBtns = container.querySelectorAll('.import-btn-option');
+    extraBtns.forEach(b => b.remove());
+    
+    actionBtn.style.display = "inline-block";
+    actionBtn.innerText = "Importar";
+    actionBtn.onclick = function() {
+        const token = textArea.value.trim();
+        if (!token) return alert("Por favor, introduce un token.");
+
+        // Hide original "Importar" button
+        actionBtn.style.display = "none";
+        
+        // --- Create Dynamic Option Buttons ---
+        
+        // 1. Importar Datos (Full)
+        const btnFull = document.createElement("button");
+        btnFull.innerText = "Importar Datos";
+        btnFull.className = "import-btn-option";
+        btnFull.style.backgroundColor = "#4CAF50"; // Green
+        btnFull.style.marginRight = "10px";
+        btnFull.onclick = () => processTokenImport(token, 'full');
+
+        // 2. Importar Solo Tareas (Reset tasks to not done)
+        const btnTasks = document.createElement("button");
+        btnTasks.innerText = "Importar Tareas";
+        btnTasks.className = "import-btn-option";
+        btnTasks.style.backgroundColor = "#2196F3"; // Blue
+        btnTasks.style.marginRight = "10px";
+        btnTasks.onclick = () => processTokenImport(token, 'tasks-only');
+
+        // Insert buttons before the hidden action button (to keep order in container)
+        container.insertBefore(btnFull, actionBtn);
+        container.insertBefore(btnTasks, actionBtn);
+    };
     
     modal.style.display = "flex";
 }
 
+function processTokenImport(token, mode) {
+    try {
+        const jsonString = decodeURIComponent(atob(token));
+        const data = JSON.parse(jsonString);
+
+        if (!data.tasks) throw new Error("Datos inválidos en el token");
+
+        if (mode === 'full') {
+            if (confirm("Se reemplazarán TODAS las tareas, puntos, racha e historial. ¿Continuar?")) {
+                localStorage.setItem('rpg_tasks', JSON.stringify(data.tasks));
+                localStorage.setItem('rpg_rewards', JSON.stringify(data.rewards || []));
+                localStorage.setItem('rpg_points', (data.points || 0).toString());
+                localStorage.setItem('rpg_streak', (data.streak || 0).toString());
+                if (data.lastLogin) localStorage.setItem('rpg_last_login', data.lastLogin);
+                localStorage.setItem('rpg_task_history', JSON.stringify(data.taskHistory || []));
+                localStorage.setItem('rpg_reward_history', JSON.stringify(data.rewardHistory || []));
+                
+                alert("Importación completa. Recargando...");
+                location.reload();
+            }
+        } else if (mode === 'tasks-only') {
+            if (confirm("Se reemplazarán tus tareas actuales con las del token (se marcarán como pendientes). Puntos y racha NO cambiarán. ¿Continuar?")) {
+                // Reset completed status for all tasks
+                Object.keys(data.tasks).forEach(day => {
+                    data.tasks[day].forEach(task => {        
+                         task.completed = false; // Force reset
+                    });
+                });
+                
+                localStorage.setItem('rpg_tasks', JSON.stringify(data.tasks));
+                // Rewards also? Usually 'Importar solo tareas' implies structure. Let's keep rewards if they exist in token to be safe, or ignore?
+                // Request said "Importar solo tareas". I'll assume rewards are part of "Full Data".
+                // So we ONLY update 'rpg_tasks'.
+                
+                alert("Tareas importadas (reiniciadas). Recargando...");
+                location.reload();
+            }
+        }
+
+    } catch (e) {
+        console.error(e);
+        alert("Error al procesar el token. Verifica que sea válido.");
+    }
+}
+
 function closeTokenModal() {
-    document.getElementById('token-modal').style.display = "none";
+    const modal = document.getElementById('token-modal');
+    modal.style.display = "none";
+    
+    // Cleanup dynamic options in case closed while open
+    const actionBtn = document.getElementById('token-action-btn');
+    if (actionBtn && actionBtn.parentElement) {
+        actionBtn.parentElement.querySelectorAll('.import-btn-option').forEach(b => b.remove());
+        actionBtn.style.display = "inline-block";
+    }
 }
 
 function copyToken() {
@@ -1745,30 +1835,6 @@ function copyToken() {
     alert("Token copiado al portapapeles");
 }
 
-function importDataFromToken() {
-    const token = document.getElementById('token-area').value;
-    if (!token) return alert("Por favor, introduce un token.");
+/* Old functions removed/replaced by above */
 
-    try {
-        const jsonString = decodeURIComponent(atob(token));
-        const data = JSON.parse(jsonString);
 
-        if (!data.tasks) throw new Error("Datos inválidos");
-
-        if (confirm("Esto sobrescribirá tus datos actuales. ¿Estás seguro?")) {
-            localStorage.setItem('rpg_tasks', JSON.stringify(data.tasks));
-            localStorage.setItem('rpg_rewards', JSON.stringify(data.rewards || []));
-            localStorage.setItem('rpg_points', (data.points || 0).toString());
-            localStorage.setItem('rpg_streak', (data.streak || 0).toString());
-            if (data.lastLogin) localStorage.setItem('rpg_last_login', data.lastLogin);
-            localStorage.setItem('rpg_task_history', JSON.stringify(data.taskHistory || []));
-            localStorage.setItem('rpg_reward_history', JSON.stringify(data.rewardHistory || []));
-
-            alert("Datos importados correctamente. La página se recargará.");
-            location.reload();
-        }
-    } catch (e) {
-        console.error(e);
-        alert("Error al importar el token. Verifica que sea válido.");
-    }
-}
