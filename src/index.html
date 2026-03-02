@@ -141,13 +141,9 @@
                     </div>
                 </div>
 
-                <div class="default-check-wrapper">
-                    <input type="checkbox" id="is-default-task">
-                    <label for="is-default-task">Por defecto</label>
-                </div>
-
+<!-- Checkbox Por defecto REMOVIDO -->
                 <div style="display: flex; gap: 10px; width: 100%; justify-content: center; margin-top: 10px;">
-                    <button onclick="addTask()" class="btn-add">Agregar</button>
+                    <button onclick="showTaskTypeModal()" class="btn-add">Agregar</button>
                     <button onclick="clearAddTaskForm()" style="background: linear-gradient(135deg, #FF9800, #F57C00);">Limpiar</button>
                     <button onclick="hideAddTaskForm()" class="btn-danger">Salir</button>
                 </div>
@@ -227,6 +223,20 @@
             <div style="display: flex; gap: 10px; justify-content: center;">
                 <button id="token-action-btn" onclick="copyToken()">Copiar Token</button>
                 <button onclick="closeTokenModal()">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para seleccionar tipo de tarea -->
+    <div id="task-type-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeTaskTypeModal()">&times;</span>
+            <h2>Agregar como</h2>
+            <p style="margin: 20px 0;">Tarea mensual: Se repetirá mensualmente</p>
+            <p style="margin: 20px 0;">Tarea diaria: Se crea solo para la fecha específica</p>
+            <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                <button onclick="confirmAddTask(true)" style="background: linear-gradient(135deg, #00d4ff, #0056b3); width: 150px;">Tarea mensual</button>
+                <button onclick="confirmAddTask(false)" style="background: linear-gradient(135deg, #FF9800, #F57C00); width: 150px;">Tarea diaria</button>
             </div>
         </div>
     </div>

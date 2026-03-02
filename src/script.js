@@ -923,7 +923,22 @@ function clearAddTaskForm() {
     if(checkbox) checkbox.checked = false;
 }
 
-function addTask() {
+function showTaskTypeModal() {
+    let input = document.getElementById("new-task-input");
+    if (!input || input.value.trim() === "") {
+        alert("Por favor, ingresa un nombre para la tarea.");
+        return;
+    }
+    document.getElementById("task-type-modal").style.display = "flex";
+}
+
+function closeTaskTypeModal() {
+    document.getElementById("task-type-modal").style.display = "none";
+}
+
+function confirmAddTask(isDefault) {
+    closeTaskTypeModal();
+
     let input = document.getElementById("new-task-input");
     let taskName = input.value.trim();
     
@@ -945,42 +960,51 @@ function addTask() {
     
     // Si tenemos horario fijo, calculamos y formateamos la duración específicamente
     if (startTime && endTime) {
-        let s = new Date(0, 0, 0, startTime.split(":")[0], startTime.split(":")[1]);
-        let e = new Date(0, 0, 0, endTime.split(":")[0], endTime.split(":")[1]);
+        // Parsear para calcular duracion
+        let sParts = startTime.split(":");
+        let eParts = endTime.split(":");
+        let s = new Date(0, 0, 0, sParts[0], sParts[1]);
+        let e = new Date(0, 0, 0, eParts[0], eParts[1]);
+        
         let diffMs = e - s;
         if (diffMs < 0) diffMs += 24 * 60 * 60 * 1000; // Cruce de medianoche
         
         let totalMinutes = Math.round(diffMs / 60000);
         
-        if (totalMinutes <= 60) {
-            duration = `${totalMinutes}min`;
-        } else {
-            let h = Math.floor(totalMinutes / 60);
+        if (totalMinutes > 0) {
+             let h = Math.floor(totalMinutes / 60);
             let m = totalMinutes % 60;
-            if (m === 0) {
-                duration = `${h}hrs`;
-            } else {
-                duration = `${h}hrs, ${m}min`;
-            }
+            if(m === 0) {
+                 if(h > 0) duration = `${h}hrs`;
+             } else {
+                 if(h > 0) duration = `${h}hrs ${m}min`;
+                 else duration = `${m}min`;
+             }
         }
     } else if (durVal !== "") {
         // Modo manual (Horario Libre)
         duration = durVal + durUnit;
     }
 
-    let checkbox = document.getElementById("is-default-task");
-    let isDefault = checkbox ? checkbox.checked : false;
-    let targetDateStr = getDateForViewDay(currentViewDay);
+    // Ya no leemos el checkbox
+    let targetDateStr = null; 
+    // Asegurarnos de tener getDateForViewDay disponible, si no usar new Date()
+    if(typeof getDateForViewDay === 'function' && typeof currentViewDay !== 'undefined') {
+        targetDateStr = getDateForViewDay(currentViewDay);
+    } else {
+         // Fallback basico si algo falla
+         targetDateStr = new Date().toISOString().split('T')[0];
+    }
+
 
     if (taskName !== "") {
         if (!tasks[currentViewDay]) {
             tasks[currentViewDay] = [];
         }
         // Guardar como objeto con estado completado, si es por defecto, horario y duración
-        // Y AHORA FECHA ESPECÍFICA para tareas puntuales
         let newTask = { 
             name: taskName, 
-            completed: false, 
+            completed: false, // Las nuevas tareas empiezan incompletas
             isDefault: isDefault,
             startTime: startTime,
             endTime: endTime,
@@ -988,24 +1012,24 @@ function addTask() {
         };
         
         if (!isDefault) {
+            // Si es NO recurrente (Diaria), le asignamos la fecha específica
+            // Para que al cambiar de día mañaña, esta tarea no aparezca si se limpia o filtra
             newTask.date = targetDateStr;
-        }
+        } 
+        // Si es Default (Mensual/Recurrente), NO le ponemos fecha fija para que aplique siempre a "Lunes", "Martes", etc.
         
         tasks[currentViewDay].push(newTask);
-        
-        // input.value = ""; // Removed: addTask should probably not auto-clear if we have a clear button? Or yes? 
-        // User workflow: Add -> Clear -> Add Next? Or Add -> Keep Form Open?
-        // Typically "Add" adds and clears inputs so you can add another.
-        // "Limpiar" is for when you made a mistake BEFORE adding.
-        // So I will keep the clean up logic.
         
         clearAddTaskForm();
         
         saveData();
         load();
-    } else {
-        alert("Por favor, ingresa un nombre para la tarea.");
     }
+}
+
+// Función addTask antigua eliminada/reemplazada por showTaskTypeModal + confirmAddTask
+function addTask_DEPRECATED() {
+    // ... codigo anterior ...
 }
 
 function addReward() {
